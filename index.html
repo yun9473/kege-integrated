@@ -1462,10 +1462,14 @@ table.dtable tbody tr{cursor:pointer;}
     <div class="kpi-card orange"><div class="kpi-label">평균 건물 연령</div><div class="kpi-value" id="lv2-kpi-age">0<span class="kpi-unit">년</span></div><div class="kpi-sub" id="lv2-kpi-age-sub">준공연도 기준</div></div>
     <div class="kpi-card"><div class="kpi-label">준공연도 미상</div><div class="kpi-value" id="lv2-kpi-noyr" style="color:#7a7a7a;">0</div><div class="kpi-sub">건물대장 미등록 추정</div></div>
   </div>
-  <div class="chart-grid-2">
+  <div class="chart-grid-3">
     <div class="card">
       <div class="card-title">준공연도별 분포 <span style="font-size:10px;font-weight:400;color:#8B5CF6;">▪ 보라색 = 40년+ 경과</span></div>
       <div class="chart-wrap"><canvas id="lv2-year-chart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">안전등급 분포</div>
+      <div class="chart-wrap"><canvas id="lv2-grade-chart"></canvas></div>
     </div>
     <div class="card">
       <div class="card-title">구조 유형별 분포</div>
@@ -1489,6 +1493,7 @@ table.dtable tbody tr{cursor:pointer;}
           <th onclick="lv2SortBy('y')" style="cursor:pointer;">준공연도</th>
           <th onclick="lv2SortBy('age')" style="cursor:pointer;">경과연수</th>
           <th onclick="lv2SortBy('ar')" style="cursor:pointer;">연면적(㎡)</th>
+          <th onclick="lv2SortBy('g')" style="cursor:pointer;">안전등급</th>
           <th onclick="lv2SortBy('st')" style="cursor:pointer;">구조</th>
           <th style="text-align:left;">주소</th>
         </tr></thead>
@@ -5090,12 +5095,13 @@ function lv2Init() {
 function lv2CSV(txt){
   var ls=txt.trim().split('\n'),hs=ls[0].replace(/^\uFEFF/,'').split(',');
   var gi=function(h){return hs.findIndex(function(x){return x.trim()===h;});};
-  var iN=gi('학교명'),iA=gi('도로명주소_카카오'),iAN=gi('NEIS_주소'),iY=gi('준공연도'),iAR=gi('연면적'),iST=gi('구조'),iS2=gi('상태');
+  var iN=gi('학교명'),iA=gi('도로명주소_카카오'),iAN=gi('NEIS_주소'),iAD=gi('도로명주소'),iY=gi('준공연도'),iAR=gi('연면적'),iST=gi('구조'),iS2=gi('상태'),iGR=gi('안전등급');
   var rs=[];
   for(var i=1;i<ls.length;i++){
     var cs=ls[i].split(',');
     if(!cs[iN]||(iS2>=0&&cs[iS2]&&cs[iS2].trim()!=='성공'))continue;
-    rs.push({n:(cs[iN]||'').trim(),a:((cs[iA]||cs[iAN]||'').trim()),y:(cs[iY]||'').trim(),ar:parseFloat(cs[iAR])||0,st:(cs[iST]||'').trim()});
+    var gr=(iGR>=0&&cs[iGR]||'').trim().replace('등급','').trim();
+    rs.push({n:(cs[iN]||'').trim(),a:((cs[iA]||cs[iAN]||cs[iAD]||'').trim()),y:(cs[iY]||'').trim(),ar:parseFloat(cs[iAR])||0,st:(cs[iST]||'').trim(),g:gr});
   }
   return rs;
 }
@@ -5161,13 +5167,15 @@ function lv2Charts(){
   var bc=Object.keys(yb).map(function(k){return(['~1960','1961~70','1971~80','1981~90'].indexOf(k)>=0)?'#8B5CF6':'#3B72D9';});
   var sc={};lv2All.forEach(function(d){if(d.st)sc[d.st]=(sc[d.st]||0)+1;});
   var ss=Object.entries(sc).sort(function(a,b){return b[1]-a[1];}).slice(0,8);
+  var gd={A:0,B:0,C:0,D:0,'미확인':0};lv2All.forEach(function(d){if(d.g&&gd.hasOwnProperty(d.g))gd[d.g]++;else gd['미확인']++;});
   var ax={ticks:{color:'#7A90B0',font:{size:10}},grid:{color:'#E2E8F0'}};
   var pl={legend:{display:false},tooltip:{callbacks:{label:function(c){return c.raw+'개';}}}};
-  var yc=document.getElementById('lv2-year-chart'),xc=document.getElementById('lv2-struct-chart');
+  var yc=document.getElementById('lv2-year-chart'),xc=document.getElementById('lv2-struct-chart'),gc=document.getElementById('lv2-grade-chart');
   if(!yc||!xc)return;
-  if(lv2YC)lv2YC.destroy();if(lv2SC)lv2SC.destroy();
+  if(lv2YC)lv2YC.destroy();if(lv2SC)lv2SC.destroy();if(window._lv2GC)window._lv2GC.destroy();
   lv2YC=new Chart(yc,{type:'bar',data:{labels:Object.keys(yb),datasets:[{data:Object.values(yb),backgroundColor:bc,borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:pl,scales:{x:ax,y:ax}}});
   lv2SC=new Chart(xc,{type:'bar',data:{labels:ss.map(function(s){return s[0].replace('철근콘크리트','RC').replace('경량철골','경량').replace('일반철골','철골').replace('일반목','목재');}),datasets:[{data:ss.map(function(s){return s[1];}),backgroundColor:'#3B72D9',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:pl,indexAxis:'y',scales:{x:ax,y:ax}}});
+  if(gc){window._lv2GC=new Chart(gc,{type:'bar',data:{labels:['A등급','B등급','C등급','D등급','미확인'],datasets:[{data:[gd.A,gd.B,gd.C,gd.D,gd['미확인']],backgroundColor:['#065F46','#0E7490','#F59E0B','#DC2626','#CBD5E1'],borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:pl,scales:{x:ax,y:ax}}});}
 }
 
 function lv2Tbl(){
@@ -5182,6 +5190,9 @@ function lv2Tbl(){
     rows+='<td>'+((d.y&&parseInt(d.y)>=1900)?d.y:'<span style="color:#9AAEC8;">미상</span>')+'</td>';
     rows+='<td>'+(a!==null?'<span style="font-weight:700;color:'+ac+';">'+a+'년</span><div class="lv2-age-track"><div class="lv2-age-fill" style="width:'+aw+'%;background:'+ac+';"></div></div>':'<span style="color:#9AAEC8;">미상</span>')+'</td>';
     rows+='<td>'+(d.ar?d.ar.toLocaleString():'-')+'</td>';
+    var gc=d.g==='A'?'#065F46':d.g==='B'?'#0E7490':d.g==='C'?'#92400E':d.g==='D'?'#991B1B':'#7A90B0';
+    var gbg=d.g==='A'?'#D1FAE5':d.g==='B'?'#CFFAFE':d.g==='C'?'#FEF3C7':d.g==='D'?'#FEE2E2':'transparent';
+    rows+='<td>'+(d.g?'<span style="display:inline-block;padding:2px 8px;border-radius:9999px;font-size:10px;font-weight:700;background:'+gbg+';color:'+gc+';">'+d.g+'등급</span>':'<span style="color:#9AAEC8;">-</span>')+'</td>';
     rows+='<td style="color:#7A90B0;font-size:10px;">'+(d.st||'-')+'</td>';
     rows+='<td style="color:#7A90B0;font-size:10px;text-align:left;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+(d.a||'-')+'</td>';
     rows+='</tr>';
