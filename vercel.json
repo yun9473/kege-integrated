@@ -1,0 +1,16 @@
+{
+  "functions": {
+    "api/proxy.js": {
+      "maxDuration": 60
+    },
+    "api/fms-proxy.js": {
+      "maxDuration": 30
+    },
+    "api/building-search.js": {
+      "maxDuration": 30
+    },
+    "api/school-search.js": {
+      "maxDuration": 30
+    }
+  }
+}
