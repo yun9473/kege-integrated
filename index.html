@@ -161,8 +161,8 @@ body{font-family:'Pretendard',system-ui,-apple-system,'Apple SD Gothic Neo',sans
 .ovt th{background:#fff;font-weight:600;font-size:11px;color:#9CA3AF;border-bottom:1px solid #EBEBEB}
 .ovt td.sname{text-align:left;font-weight:600;white-space:nowrap;padding:8px 10px;background:#fff;font-size:13px;color:#111}
 .ovt td.reg{font-size:11px;color:#9CA3AF;white-space:nowrap}
-.ovt th.vhdr{width:42px;max-width:46px;padding:6px 2px;height:110px;vertical-align:bottom}
-.ovt th.vhdr .vt{writing-mode:vertical-rl;font-size:11px;font-weight:600;white-space:nowrap;line-height:1.3;display:block;text-align:left;color:#111}
+.ovt th.vhdr{min-width:58px;padding:10px 4px;vertical-align:middle}
+.ovt th.vhdr .vt{font-size:10px;font-weight:500;color:#6B7280;line-height:1.5;white-space:normal;text-align:center}
 /* category header row */
 .ovt th.cat-grp{font-weight:700;font-size:11px;letter-spacing:.3px;padding:8px 4px;border-bottom:1px solid #EBEBEB}
 .ovt th.cat-grp.cg-common{color:#6366F1;border-top:2px solid #6366F1}
@@ -193,6 +193,35 @@ body{font-family:'Pretendard',system-ui,-apple-system,'Apple SD Gothic Neo',sans
 .pct-ok{background:var(--green-l);color:var(--green);font-weight:700;font-size:11px}
 .pct-half{background:var(--amber-l);color:var(--amber);font-weight:700;font-size:11px}
 .pct-low{background:var(--red-l);color:var(--red);font-weight:700;font-size:11px}
+
+/* MOBILE */
+@media(max-width:768px){
+  .body-wrap{flex-direction:column}
+  .sidebar{width:100%;max-height:none;border-right:none;border-bottom:1px solid #f0f0f0;flex-direction:row;overflow-x:auto}
+  .s-sec{padding:4px 0}.s-lbl{display:none}
+  .s-item{padding:8px 12px;white-space:nowrap;border-left:none;border-bottom:2px solid transparent}
+  .s-item.active{border-left:none;border-bottom-color:#0066cc}
+  .main{padding:16px}
+  #module-upload .body-wrap{height:auto}
+  .split{grid-template-columns:1fr !important}
+  .admin-grid{grid-template-columns:1fr !important}
+  .sgrid{grid-template-columns:repeat(2,1fr) !important;gap:8px}
+  .sval{font-size:36px !important}
+  .st-page-hdr{flex-direction:column;gap:12px}
+  .st-hdr-right{text-align:left;min-width:auto}
+  .st-hdr-right .st-pct-num{font-size:28px}
+  .ov-card{padding:12px}
+  .ovw{max-height:60vh}
+  .topbar{padding:0 12px;height:40px}
+  .topbar-title{font-size:11px}
+  .integrated-nav{height:40px}
+  .integrated-nav .nav-item{padding:0 14px;font-size:12px}
+  #screen-module-select div[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr !important}
+  #screen-screen-select div[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr !important}
+  #screen-module-select div[style*="font-size:40px"]{font-size:28px !important}
+  #screen-screen-select div[style*="font-size:40px"]{font-size:28px !important}
+  .lcard{padding:28px 20px !important;max-width:100% !important}
+}
 
 /* ROUTING TABLE */
 .rt-tbl{width:100%;border-collapse:collapse;font-size:13px}
@@ -3341,17 +3370,17 @@ function buildStatusScreen(){
 
   // ── Overview table ──
   const cols=[
-    {key:'overview', label:'학교별개요',               grp:'common'},
+    {key:'overview', label:'학교별<br>개요',             grp:'common'},
     {key:'drawing',  label:'도면',                     grp:'common'},
-    {key:'building', label:'건축물대장',               grp:'common'},
-    {key:'public',   label:'공유재산관리대장',         grp:'common'},
+    {key:'building', label:'건축물<br>대장',           grp:'common'},
+    {key:'public',   label:'공유재산<br>관리대장',     grp:'common'},
     {key:'realmap',  label:'실배치도',                 grp:'common'},
-    {key:'interview',label:'사전인터뷰자료',           grp:'common'},
-    {key:'student',  label:'중장기학생배치계획',       grp:'func'},
-    {key:'standard', label:'학교급별시설기준',         grp:'func'},
-    {key:'c3',       label:'구조보고서',               grp:'struct', isGroup:true},
-    {key:'seismic',  label:'내진성능평가보고서',       grp:'struct'},
-    {key:'maint',    label:'개보수이력',               grp:'econ'},
+    {key:'interview',label:'사전인터뷰<br>부자료',     grp:'common'},
+    {key:'student',  label:'중장기<br>학생배치계획',   grp:'func'},
+    {key:'standard', label:'학교급별<br>시설기준',     grp:'func'},
+    {key:'c3',       label:'구조<br>보고서',           grp:'struct', isGroup:true},
+    {key:'seismic',  label:'내진성능<br>평가보고서',   grp:'struct'},
+    {key:'maint',    label:'개보수<br>이력',           grp:'econ'},
   ];
 
   const grpMeta={
@@ -3365,7 +3394,7 @@ function buildStatusScreen(){
   const ROW1H=36;
 
   let hdr1=`<tr>
-    <th rowspan="2" style="text-align:left;padding:8px 12px;min-width:160px;position:sticky;left:0;top:0;z-index:5;font-size:12px;font-weight:700;color:#111;background:#fff;border-bottom:1px solid #EBEBEB">대상교</th>
+    <th rowspan="2" style="text-align:left;padding:8px 12px;min-width:120px;position:sticky;left:0;top:0;z-index:5;font-size:12px;font-weight:700;color:#111;background:#fff;border-bottom:1px solid #EBEBEB">대상교</th>
     <th rowspan="2" style="min-width:52px;position:sticky;top:0;z-index:4;font-size:12px;font-weight:700;color:#111;background:#fff;border-bottom:1px solid #EBEBEB">권역</th>`;
   Object.entries(grpMeta).forEach(([,g])=>{
     hdr1+=`<th class="cat-grp ${g.cls}" colspan="${g.count}" style="position:sticky;top:0;z-index:4;background:#fff">${g.label}</th>`;
