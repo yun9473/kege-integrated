@@ -448,6 +448,40 @@ table.dtable tbody tr{cursor:pointer;}
 </div>
 
 <!-- ═══════════════════════════════ -->
+<!-- MODULE SELECT (관리자 전용)      -->
+<!-- ═══════════════════════════════ -->
+<div id="screen-module-select" style="display:none;min-height:100vh;background:#f5f5f7;font-family:'Pretendard',system-ui,-apple-system,sans-serif;">
+  <div style="max-width:980px;margin:0 auto;padding:80px 24px 48px;">
+    <div style="text-align:center;margin-bottom:12px;">
+      <img src="kege_logo.png" alt="KEGE" style="height:36px;"/>
+    </div>
+    <div style="text-align:center;margin-bottom:8px;font-size:40px;font-weight:600;color:#1d1d1f;line-height:1.1;letter-spacing:0;">공간재구조화 연구 시스템</div>
+    <div style="text-align:center;margin-bottom:48px;font-size:17px;font-weight:400;color:#7a7a7a;line-height:1.47;">사용할 시스템을 선택하세요.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:720px;margin:0 auto;">
+      <!-- 기초자료 수신 관리 타일 (Light) -->
+      <div onclick="enterModule('upload')" style="background:#ffffff;border-radius:18px;border:1px solid #e0e0e0;padding:48px 32px;text-align:center;cursor:pointer;transition:all .2s;" onmouseenter="this.style.borderColor='#0066cc'" onmouseleave="this.style.borderColor='#e0e0e0'">
+        <div style="font-size:48px;margin-bottom:20px;line-height:1;color:#0066cc;">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#0066cc" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        </div>
+        <div style="font-size:21px;font-weight:600;color:#1d1d1f;margin-bottom:8px;letter-spacing:0.2px;">기초자료 수신 관리</div>
+        <div style="font-size:14px;color:#7a7a7a;line-height:1.5;">학교별 파일 업로드<br>수신 현황 · 관리자 설정</div>
+      </div>
+      <!-- 개축타당성 대시보드 타일 (Dark) -->
+      <div onclick="enterModule('dashboard')" style="background:#272729;border-radius:18px;border:1px solid #272729;padding:48px 32px;text-align:center;cursor:pointer;transition:all .2s;" onmouseenter="this.style.borderColor='#0066cc'" onmouseleave="this.style.borderColor='#272729'">
+        <div style="font-size:48px;margin-bottom:20px;line-height:1;">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#2997ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="3" y1="20" x2="21" y2="20"/></svg>
+        </div>
+        <div style="font-size:21px;font-weight:600;color:#ffffff;margin-bottom:8px;letter-spacing:0.2px;">개축타당성 대시보드</div>
+        <div style="font-size:14px;color:#cccccc;line-height:1.5;">전국 데이터 분석<br>교육청별 총괄 · 예측 모델</div>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:32px;">
+      <button onclick="logoutFromModuleSelect()" style="background:none;border:none;color:#0066cc;font-size:14px;cursor:pointer;font-family:inherit;">로그아웃</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ -->
 <!-- INTEGRATED APP SHELL           -->
 <!-- ═══════════════════════════════ -->
 <div id="screen-app" class="app" style="display:none">
@@ -2507,11 +2541,30 @@ async function enterAdminProject(){
   }catch(e){ showLoginErr('프로젝트 로드 실패: '+e.message); }
 }
 
+var _pendingLabel='';
+function enterModule(mod){
+  document.getElementById('screen-module-select').style.display='none';
+  document.getElementById('screen-app').style.display='flex';
+  if(mod==='dashboard'){
+    document.getElementById('nav-dashboard').click();
+  } else {
+    document.getElementById('nav-upload').click();
+  }
+}
+function logoutFromModuleSelect(){
+  document.getElementById('screen-module-select').style.display='none';
+  document.getElementById('screen-login').style.display='flex';
+  role='school'; visIds=[]; currentProject=null; SCHOOLS=[]; DEFAULT_CODES={};
+}
 async function startApp(label){
   localStorage.setItem('bzSession', JSON.stringify({role, visIds, label, projectId: currentProject?.id||null}));
   await loadServerConfig();
   document.getElementById('screen-login').style.display='none';
-  document.getElementById('screen-app').style.display='flex';
+  if(role==='admin'){
+    document.getElementById('screen-module-select').style.display='block';
+    _pendingLabel=label;
+  }
+  document.getElementById('screen-app').style.display=(role==='admin')?'none':'flex';
   document.getElementById('tu').textContent=label;
   if(role==='admin') document.getElementById('mi-admin').style.display='flex';
   document.getElementById('nav-dashboard').style.display=(role==='admin')?'':'none';
@@ -2544,6 +2597,7 @@ function logout(){
   localStorage.removeItem('bzSession');
   document.getElementById('screen-login').style.display='flex';
   document.getElementById('screen-app').style.display='none';
+  document.getElementById('screen-module-select').style.display='none';
   role='school'; visIds=[]; curSchoolId=null; schoolFiles=[]; bulkFiles=[];
   currentProject=null; SCHOOLS=[]; DEFAULT_CODES={};
   // 로그인 탭 초기 상태 복원
