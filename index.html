@@ -608,9 +608,9 @@ table.dtable tbody tr{cursor:pointer;}
 
         <!-- SCHOOL PANEL -->
         <div id="panel-school">
-          <div id="school-tabs-card" class="card">
-            <div class="card-title"> 건물동 선택</div>
-            <div style="font-size:12px;color:var(--gray);margin-bottom:10px">같은 학교에 건물동이 여러 개 있습니다. 파일을 올릴 건물동을 선택하세요.</div>
+          <div id="school-tabs-card">
+            <div style="font-size:21px;font-weight:600;color:#1d1d1f;margin-bottom:6px;letter-spacing:0.2px;">건물동 선택</div>
+            <div style="font-size:14px;color:#7a7a7a;margin-bottom:20px;">파일을 올릴 건물동을 선택하세요.</div>
             <div id="stabs-body"></div>
           </div>
           <div id="sel-panel" style="display:none">
@@ -2608,12 +2608,7 @@ async function startApp(label){
     : `전체 ${SCHOOLS.length}개동 (${role==='agency'?'발주청':'관리자'} 모드)`;
   // 학교: 탭이 1개면 자동 선택, 여러 개면 탭 표시
   if(role==='school'){
-    if(my.length===1){
-      document.getElementById('school-tabs-card').style.display='none';
-      selectSchool(my[0].id);
-    } else {
-      document.getElementById('school-tabs-card').style.display='block';
-    }
+    document.getElementById('school-tabs-card').style.display='block';
   }
 }
 
@@ -2665,13 +2660,20 @@ function updatePaBanner(){
 // ════════════════════════════════════
 function buildSchoolTabs(){
   const my=SCHOOLS.filter(s=>visIds.includes(s.id));
-  const regions=[...new Set(my.map(s=>s.region))].sort();
-  document.getElementById('stabs-body').innerHTML=regions.map(r=>{
-    const list=my.filter(s=>s.region===r);
-    return `<div style="margin-bottom:8px"><div class="rlbl">${r}</div><div class="stabs">
-      ${list.map(s=>`<button class="stab" id="stab-${s.id}" onclick="selectSchool(${s.id})">${sLabel(s)}${s.type==='사립'?' 🔴':''}</button>`).join('')}
-    </div></div>`;
-  }).join('');
+  const cols=my.length<=2?my.length:my.length<=4?2:3;
+  document.getElementById('stabs-body').innerHTML=
+    `<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:16px;">` +
+    my.map(s=>{
+      const cl=getCL();const {ok,total}=getStatus(s.id,cl);
+      const pct=total>0?Math.round(ok/total*100):0;
+      const pctColor=pct===100?'#065F46':pct>0?'#92400E':'#7a7a7a';
+      return `<div id="stab-${s.id}" onclick="selectSchool(${s.id})" style="background:#fff;border-radius:18px;border:1px solid #e0e0e0;padding:28px 24px;cursor:pointer;transition:all .2s;text-align:center;" onmouseenter="this.style.borderColor='#0066cc'" onmouseleave="this.style.borderColor=curSchoolId===${s.id}?'#0066cc':'#e0e0e0'">
+        <div style="font-size:17px;font-weight:600;color:#1d1d1f;margin-bottom:4px;">${s.building}</div>
+        <div style="font-size:12px;color:#7a7a7a;margin-bottom:12px;">${s.school} · ${s.region}</div>
+        <div style="font-size:24px;font-weight:600;color:${pctColor};margin-bottom:4px;">${pct}%</div>
+        <div style="font-size:11px;color:#7a7a7a;">${ok}/${total} 항목 완료</div>
+      </div>`;
+    }).join('') + '</div>';
 }
 
 function buildSidebar(){
