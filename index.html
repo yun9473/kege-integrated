@@ -240,8 +240,9 @@ body{font-family:'Pretendard',system-ui,-apple-system,'Apple SD Gothic Neo',sans
   .body-wrap{flex-direction:column;overflow:visible !important;height:auto !important;min-height:0 !important}
   #module-upload .body-wrap{height:auto !important;min-height:0 !important}
   #module-dashboard .body-wrap{height:auto !important;min-height:0 !important}
-  .sidebar{width:100%;max-height:none;border-right:none;border-bottom:1px solid #f0f0f0;flex-direction:row;overflow-x:auto;-webkit-overflow-scrolling:touch;flex-shrink:0}
+  .sidebar{width:100%;max-height:none;border-right:none;border-bottom:1px solid #f0f0f0;flex-direction:row;overflow-x:auto;-webkit-overflow-scrolling:touch;flex-shrink:0;position:sticky;top:0;z-index:10;background:#fff}
   .s-sec{padding:4px 0;display:flex;flex-direction:row}.s-lbl{display:none}
+  .s-sec:last-child{display:none !important}
   .s-item{padding:10px 14px;white-space:nowrap;border-left:none;border-bottom:2px solid transparent;flex-shrink:0}
   .s-item.active{border-left:none;border-bottom-color:#0066cc}
   .main{padding:16px;overflow-y:visible;-webkit-overflow-scrolling:touch;height:auto !important;flex:none !important}
@@ -4010,7 +4011,7 @@ function showScreen(n){
   const mi=document.getElementById('mi-'+n); if(mi) mi.classList.add('active');
   if(n==='status') buildStatusScreen();
   if(n==='admin')  buildCodeTable();
-  document.querySelector('.main').scrollTop=0;
+  var m=document.querySelector('.main');if(m)m.scrollTop=0;window.scrollTo(0,0);
 }
 function setPg(which,text,pct){
   document.getElementById('pg-'+which).classList.add('on');
