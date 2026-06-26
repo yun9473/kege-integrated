@@ -194,33 +194,176 @@ body{font-family:'Pretendard',system-ui,-apple-system,'Apple SD Gothic Neo',sans
 .pct-half{background:var(--amber-l);color:var(--amber);font-weight:700;font-size:11px}
 .pct-low{background:var(--red-l);color:var(--red);font-weight:700;font-size:11px}
 
-/* MOBILE */
+/* ═══ MOBILE LAYOUT ═══ */
 @media(max-width:768px){
+  /* ── 공통 ── */
+  body{font-size:15px}
+  .topbar{padding:0 12px;height:44px}
+  .topbar-title{font-size:11px}
+  .topbar-right .tu{font-size:11px;padding:3px 10px}
+  .topbar-right .tbtn{font-size:11px;padding:4px 10px}
+  .integrated-nav{height:42px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .integrated-nav .nav-item{padding:0 12px;font-size:12px;white-space:nowrap;flex-shrink:0}
+
+  /* ── 로그인 ── */
+  #screen-login{padding:16px;align-items:flex-start;padding-top:10vh}
+  .lcard{padding:28px 20px !important;max-width:100% !important;border-radius:16px;margin:0 4px}
+  .llogo img{max-width:180px !important}
+  .ltitle{font-size:24px}
+  .lsub{font-size:15px;margin-bottom:24px}
+  .ltabs{gap:4px;padding:3px}
+  .ltab{padding:9px 4px;font-size:13px}
+  .fi{padding:12px 14px;font-size:16px;border-radius:10px}
+  .btn-fw{padding:13px 0;font-size:16px}
+
+  /* ── 모듈 선택 (관리자) ── */
+  #screen-module-select>div{padding:40px 16px 32px !important}
+  #screen-module-select div[style*="grid-template-columns"]{grid-template-columns:1fr !important;gap:14px !important}
+  #screen-module-select div[style*="font-size:40px"]{font-size:26px !important}
+  #screen-module-select div[style*="font-size:17px"]{font-size:14px !important;margin-bottom:28px !important}
+  #screen-module-select div[onclick*="enterModule"]{padding:28px 20px !important;border-radius:14px !important}
+  #screen-module-select div[onclick*="enterModule"] svg{width:36px !important;height:36px !important}
+  #screen-module-select div[onclick*="enterModule"] div[style*="font-size:21px"]{font-size:18px !important}
+  #screen-module-select div[onclick*="enterModule"] div[style*="font-size:14px"]{font-size:13px !important}
+  #screen-module-select img[alt="KEGE"]{height:28px !important}
+
+  /* ── 화면 선택 (학교/발주청) ── */
+  #screen-screen-select>div{padding:40px 16px 32px !important}
+  #screen-screen-select div[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr !important;gap:14px !important}
+  #screen-screen-select div[style*="font-size:40px"]{font-size:26px !important}
+  #screen-screen-select div[onclick*="enterScreen"]{padding:28px 20px !important;border-radius:14px !important}
+  #screen-screen-select div[onclick*="enterScreen"] svg{width:36px !important;height:36px !important}
+  #screen-screen-select div[onclick*="enterScreen"] div[style*="font-size:21px"]{font-size:18px !important}
+  #screen-screen-select img[alt="KEGE"]{height:28px !important}
+
+  /* ── 기초자료 수신 관리 ── */
   .body-wrap{flex-direction:column}
-  .sidebar{width:100%;max-height:none;border-right:none;border-bottom:1px solid #f0f0f0;flex-direction:row;overflow-x:auto}
-  .s-sec{padding:4px 0}.s-lbl{display:none}
-  .s-item{padding:8px 12px;white-space:nowrap;border-left:none;border-bottom:2px solid transparent}
+  #module-upload .body-wrap{height:auto;min-height:calc(100vh - 86px)}
+  .sidebar{width:100%;max-height:none;border-right:none;border-bottom:1px solid #f0f0f0;flex-direction:row;overflow-x:auto;-webkit-overflow-scrolling:touch;flex-shrink:0}
+  .s-sec{padding:4px 0;display:flex;flex-direction:row}.s-lbl{display:none}
+  .s-item{padding:10px 14px;white-space:nowrap;border-left:none;border-bottom:2px solid transparent;flex-shrink:0}
   .s-item.active{border-left:none;border-bottom-color:#0066cc}
-  .main{padding:16px}
-  #module-upload .body-wrap{height:auto}
+  .main{padding:16px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+
+  /* 카드/그리드 */
+  .card{padding:16px;border-radius:14px;margin-bottom:12px}
   .split{grid-template-columns:1fr !important}
   .admin-grid{grid-template-columns:1fr !important}
+
+  /* 수신현황 통계 */
   .sgrid{grid-template-columns:repeat(2,1fr) !important;gap:8px}
-  .sval{font-size:36px !important}
-  .st-page-hdr{flex-direction:column;gap:12px}
+  .scard{padding:14px 16px;border-radius:12px}
+  .sval{font-size:32px !important}
+  .slabel{font-size:10px}
+  .sdesc{font-size:10px}
+  .st-page-hdr{flex-direction:column;gap:10px;align-items:flex-start}
   .st-hdr-right{text-align:left;min-width:auto}
   .st-hdr-right .st-pct-num{font-size:28px}
-  .ov-card{padding:12px}
-  .ovw{max-height:60vh}
-  .topbar{padding:0 12px;height:40px}
-  .topbar-title{font-size:11px}
-  .integrated-nav{height:40px}
-  .integrated-nav .nav-item{padding:0 14px;font-size:12px}
-  #screen-module-select div[style*="grid-template-columns"]{grid-template-columns:1fr !important}
-  #screen-screen-select div[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr !important}
-  #screen-module-select div[style*="font-size:40px"]{font-size:28px !important}
-  #screen-screen-select div[style*="font-size:40px"]{font-size:28px !important}
-  .lcard{padding:28px 20px !important;max-width:100% !important}
+  .st-hdr-left .st-title{font-size:22px}
+
+  /* 수신현황 테이블 → 카드형 */
+  .ov-card{padding:12px;border-radius:12px}
+  .ovw{max-height:none;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .ovt{font-size:12px}
+  .ovt th,.ovt td{padding:6px 4px}
+  .ovt th.vhdr{min-width:44px}
+  .ovt th.vhdr .vt{font-size:9px}
+  .ovt td.sname{font-size:12px;padding:6px 8px}
+
+  /* 드롭존 */
+  .dz{padding:24px 16px}
+  .dz-ico{font-size:28px}
+  .dz-t{font-size:13px}
+
+  /* 체크리스트 테이블 */
+  .cl-tbl{font-size:12px}
+  .cl-tbl th,.cl-tbl td{padding:8px 8px}
+
+  /* 파일 리스트 */
+  .fitem{padding:8px 10px}
+  .fitem-name{font-size:12px}
+
+  /* 라우팅 테이블 */
+  .rt-tbl{font-size:12px}
+  .rt-tbl th,.rt-tbl td{padding:8px 10px}
+  .rt-sel{padding:12px 14px;font-size:15px}
+
+  /* 학교 탭 */
+  .stabs{gap:4px}
+  .stab{padding:5px 10px;font-size:11px}
+
+  /* ── 대시보드 ── */
+  .header{padding:12px 16px;flex-direction:column;gap:10px}
+  .header-title{font-size:14px}
+  .header-badges{gap:8px;width:100%;justify-content:space-between}
+  .hbadge{padding:6px 10px;font-size:10px;flex:1;text-align:center}
+  .hbadge strong{font-size:16px}
+  .legend-box{gap:6px}
+  .legend-item{font-size:10px}
+  .tab-bar{padding:0 12px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .tab{padding:10px 14px;font-size:12px;white-space:nowrap;flex-shrink:0}
+  #module-dashboard .main{padding:12px 14px;gap:10px}
+  .kpi-row{grid-template-columns:repeat(2,1fr) !important;gap:8px}
+  .kpi-card{padding:12px 14px;border-radius:14px}
+  .kpi-value{font-size:18px}
+  .kpi-label{font-size:9px}
+  .kpi-sub{font-size:9px}
+  .chart-grid-2{grid-template-columns:1fr !important}
+  .chart-grid-3{grid-template-columns:1fr !important}
+  #module-dashboard .card{padding:14px;border-radius:14px}
+  #module-dashboard .card-title{font-size:11px}
+  .chart-wrap{height:200px}
+  .chart-wrap-tall{height:240px}
+  .chart-wrap-sm{height:160px}
+  .tbl-wrap{max-height:300px}
+  table.dtable th{font-size:11px;padding:8px 8px}
+  table.dtable td{font-size:12px;padding:10px 8px}
+  .info-banner{font-size:10px;padding:8px 12px}
+  .sido-filter{gap:4px}
+  .sido-chip{padding:3px 8px;font-size:10px}
+  .compare-legend{padding:6px 10px;gap:8px}
+  .cl-item{font-size:10px}
+  .note{font-size:9px}
+
+  /* 교육청별 총괄 */
+  .edu-chip{padding:6px 12px;font-size:11px}
+  .edu-subtab{padding:8px 14px;font-size:11px}
+
+  /* 심층분석 */
+  .ana-subtab{padding:8px 14px;font-size:11px}
+  .indicator-grid{grid-template-columns:1fr !important}
+  .ind-category{padding:12px}
+
+  /* 복합 위험도 */
+  .risk-badge{font-size:10px;padding:2px 7px}
+
+  /* 사업 예측 모델 */
+  .pred-section{padding:14px;border-radius:14px}
+  .pred-big{font-size:36px}
+  .pred-stat-grid{grid-template-columns:1fr !important}
+  .pred-result-box{padding:16px;border-radius:14px}
+
+  /* 지역별 분석 lv2 */
+  .lv2-reg-tab{padding:5px 10px;font-size:11px}
+  .lv2-upload{padding:10px;font-size:11px;border-radius:14px}
+
+  /* 모달 → 모바일 풀스크린 */
+  .modal-overlay{padding:0 !important;align-items:flex-end !important}
+  .modal-box{width:100% !important;max-width:100% !important;max-height:92vh;border-radius:18px 18px 0 0 !important;margin:0}
+  .modal-head{border-radius:18px 18px 0 0;padding:14px 16px}
+  .modal-school{font-size:14px}
+  .modal-body{padding:14px}
+  .m-grid{grid-template-columns:1fr !important}
+  .m-row{padding:4px 0}
+  .m-key,.m-val{font-size:10px}
+
+  /* ── 연구 진행 ── */
+  .research-subtabs{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .research-subtabs .tab{white-space:nowrap;flex-shrink:0}
+
+  /* hwpx 보고서 */
+  .hwpx-upload-area{padding:16px !important}
+  .hwpx-grid{grid-template-columns:1fr !important}
 }
 
 /* ROUTING TABLE */
