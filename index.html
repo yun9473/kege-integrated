@@ -198,12 +198,14 @@ body{font-family:'Pretendard',system-ui,-apple-system,'Apple SD Gothic Neo',sans
 @media(max-width:768px){
   /* ── 공통 ── */
   body{font-size:15px}
-  .topbar{padding:0 12px;height:44px}
-  .topbar-title{font-size:11px}
-  .topbar-right .tu{font-size:11px;padding:3px 10px}
-  .topbar-right .tbtn{font-size:11px;padding:4px 10px}
-  .integrated-nav{height:42px;overflow-x:auto;-webkit-overflow-scrolling:touch}
-  .integrated-nav .nav-item{padding:0 12px;font-size:12px;white-space:nowrap;flex-shrink:0}
+  .topbar{padding:6px 12px;height:auto;flex-wrap:wrap;gap:4px 8px}
+  .topbar-title{font-size:11px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .topbar-title img{height:18px !important;margin-right:6px !important}
+  .topbar-right{gap:6px;flex-shrink:0}
+  .topbar-right .tu{font-size:10px;padding:3px 8px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .topbar-right .tbtn{font-size:10px;padding:3px 8px}
+  .integrated-nav{height:38px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .integrated-nav .nav-item{padding:0 10px;font-size:11px;white-space:nowrap;flex-shrink:0}
 
   /* ── 로그인 ── */
   #screen-login{padding:16px;align-items:flex-start;padding-top:10vh}
