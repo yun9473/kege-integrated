@@ -237,13 +237,14 @@ body{font-family:'Pretendard',system-ui,-apple-system,'Apple SD Gothic Neo',sans
   #screen-screen-select img[alt="KEGE"]{height:28px !important}
 
   /* ── 기초자료 수신 관리 ── */
-  .body-wrap{flex-direction:column}
-  #module-upload .body-wrap{height:auto;min-height:calc(100vh - 86px)}
+  .body-wrap{flex-direction:column;overflow:visible !important;height:auto !important;min-height:0 !important}
+  #module-upload .body-wrap{height:auto !important;min-height:0 !important}
+  #module-dashboard .body-wrap{height:auto !important;min-height:0 !important}
   .sidebar{width:100%;max-height:none;border-right:none;border-bottom:1px solid #f0f0f0;flex-direction:row;overflow-x:auto;-webkit-overflow-scrolling:touch;flex-shrink:0}
   .s-sec{padding:4px 0;display:flex;flex-direction:row}.s-lbl{display:none}
   .s-item{padding:10px 14px;white-space:nowrap;border-left:none;border-bottom:2px solid transparent;flex-shrink:0}
   .s-item.active{border-left:none;border-bottom-color:#0066cc}
-  .main{padding:16px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .main{padding:16px;overflow-y:visible;-webkit-overflow-scrolling:touch;height:auto !important;flex:none !important}
 
   /* 카드/그리드 */
   .card{padding:16px;border-radius:14px;margin-bottom:12px}
@@ -263,7 +264,7 @@ body{font-family:'Pretendard',system-ui,-apple-system,'Apple SD Gothic Neo',sans
 
   /* 수신현황 테이블 → 카드형 */
   .ov-card{padding:12px;border-radius:12px}
-  .ovw{max-height:none;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .ovw{max-height:none !important;overflow-x:auto;-webkit-overflow-scrolling:touch;overflow-y:visible}
   .ovt{font-size:12px}
   .ovt th,.ovt td{padding:6px 4px}
   .ovt th.vhdr{min-width:44px}
@@ -315,7 +316,7 @@ body{font-family:'Pretendard',system-ui,-apple-system,'Apple SD Gothic Neo',sans
   .chart-wrap{height:200px}
   .chart-wrap-tall{height:240px}
   .chart-wrap-sm{height:160px}
-  .tbl-wrap{max-height:300px}
+  .tbl-wrap{max-height:none !important;overflow-y:visible}
   table.dtable th{font-size:11px;padding:8px 8px}
   table.dtable td{font-size:12px;padding:10px 8px}
   .info-banner{font-size:10px;padding:8px 12px}
