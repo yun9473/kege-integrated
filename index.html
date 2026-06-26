@@ -426,6 +426,14 @@ table.dtable tbody tr{cursor:pointer;}
 .module-panel{display:none}
 .module-panel.active{display:block}
 
+/* RESEARCH SUB-TABS */
+.research-tabs{display:flex;border-bottom:1px solid #e0e0e0;margin-bottom:32px}
+.research-tab{padding:12px 24px;font-size:15px;font-weight:500;color:#7a7a7a;cursor:pointer;border-bottom:3px solid transparent;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit;transition:.15s}
+.research-tab:hover{color:#1d1d1f}
+.research-tab.active{color:#1d1d1f;border-bottom-color:#0066cc}
+.research-subtab{display:none}
+.research-subtab.active{display:block}
+
 /* Fix module-upload body-wrap height accounting for nav */
 #module-upload .body-wrap{height:calc(100vh - 96px)}
 #module-dashboard .body-wrap{height:calc(100vh - 96px)}
@@ -533,12 +541,12 @@ table.dtable tbody tr{cursor:pointer;}
         <div style="font-size:21px;font-weight:600;color:#1d1d1f;margin-bottom:8px;letter-spacing:0.2px;">개축타당성 데이터베이스</div>
         <div style="font-size:14px;color:#7a7a7a;line-height:1.5;">데이터 분석 · 교육청 총괄 · 예측</div>
       </div>
-      <div onclick="enterModule('dxf2ppt')" style="background:#ffffff;border-radius:18px;border:1px solid #e0e0e0;padding:48px 32px;text-align:center;cursor:pointer;transition:all .25s ease;" onmouseenter="this.style.transform='scale(0.97)';this.style.background='#fafafa';this.style.borderColor='#c0c0c0'" onmouseleave="this.style.transform='none';this.style.background='#ffffff';this.style.borderColor='#e0e0e0'">
+      <div onclick="enterModule('research')" style="background:#ffffff;border-radius:18px;border:1px solid #e0e0e0;padding:48px 32px;text-align:center;cursor:pointer;transition:all .25s ease;" onmouseenter="this.style.transform='scale(0.97)';this.style.background='#fafafa';this.style.borderColor='#c0c0c0'" onmouseleave="this.style.transform='none';this.style.background='#ffffff';this.style.borderColor='#e0e0e0'">
         <div style="margin-bottom:20px;line-height:1;">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6v3H9z"/><path d="M6 6V3H4v18h16V3h-2v3H6z"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="12" y1="9" x2="12" y2="15"/></svg>
         </div>
-        <div style="font-size:21px;font-weight:600;color:#1d1d1f;margin-bottom:8px;letter-spacing:0.2px;">증축이력 조사</div>
-        <div style="font-size:14px;color:#7a7a7a;line-height:1.5;">DXF 업로드 · PPT 자동 변환</div>
+        <div style="font-size:21px;font-weight:600;color:#1d1d1f;margin-bottom:8px;letter-spacing:0.2px;">연구 진행</div>
+        <div style="font-size:14px;color:#7a7a7a;line-height:1.5;">보고서 작성 · 증축이력 조사</div>
       </div>
     </div>
     <div style="text-align:center;margin-top:32px;">
@@ -595,7 +603,7 @@ table.dtable tbody tr{cursor:pointer;}
   <div class="integrated-nav">
     <button class="nav-item active" id="nav-upload" onclick="switchModule('upload',this)"> 기초자료 수신 관리</button>
     <button class="nav-item" id="nav-dashboard" onclick="switchModule('dashboard',this)"> 개축타당성 데이터베이스</button>
-    <button class="nav-item" id="nav-dxf2ppt" style="display:none" onclick="switchModule('dxf2ppt',this)"> 증축이력 조사</button>
+    <button class="nav-item" id="nav-research" style="display:none" onclick="switchModule('research',this)"> 연구 진행</button>
   </div>
 
   <!-- Module: Upload System -->
@@ -1995,45 +2003,80 @@ table.dtable tbody tr{cursor:pointer;}
   </div>
 </div>
 
-  <!-- DXF2PPT MODULE -->
-  <div id="module-dxf2ppt" class="module-panel">
+  <!-- RESEARCH MODULE -->
+  <div id="module-research" class="module-panel">
     <div style="max-width:800px;margin:0 auto;padding:80px 24px 48px;">
-      <div style="text-align:center;margin-bottom:48px;">
-        <div style="font-size:12px;font-weight:600;color:#0066cc;letter-spacing:.08em;margin-bottom:8px;">DXF2PPT</div>
-        <div style="font-size:40px;font-weight:600;color:#1d1d1f;letter-spacing:0;line-height:1.1;">증축이력 조사</div>
-        <div style="font-size:17px;color:#7a7a7a;margin-top:12px;line-height:1.47;">DXF 도면을 분석하여 증축이력 PPT를 자동으로 생성합니다.</div>
+      <div style="text-align:center;margin-bottom:32px;">
+        <div style="font-size:12px;font-weight:600;color:#0066cc;letter-spacing:.08em;margin-bottom:8px;">RESEARCH</div>
+        <div style="font-size:40px;font-weight:600;color:#1d1d1f;letter-spacing:0;line-height:1.1;">연구 진행</div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:640px;margin:0 auto 48px;">
-        <a href="https://github.com/yun9473/dxf2ppt-api/releases/download/v1.0.0/DXF2PPT.exe" style="background:#0066cc;border-radius:18px;padding:32px 24px;text-align:center;text-decoration:none;transition:all .2s;display:block;" onmouseenter="this.style.opacity='0.9'" onmouseleave="this.style.opacity='1'">
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:12px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          <div style="font-size:17px;font-weight:600;color:#fff;margin-bottom:4px;">DXF2PPT.exe</div>
-          <div style="font-size:12px;color:rgba(255,255,255,.7);">Windows 전용 · 57MB</div>
-        </a>
-        <a href="https://github.com/yun9473/dxf2ppt-api/releases/download/v1.0.0/default.pptx" style="background:#fff;border-radius:18px;border:1px solid #e0e0e0;padding:32px 24px;text-align:center;text-decoration:none;transition:all .2s;display:block;" onmouseenter="this.style.borderColor='#0066cc'" onmouseleave="this.style.borderColor='#e0e0e0'">
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#0066cc" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:12px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          <div style="font-size:17px;font-weight:600;color:#1d1d1f;margin-bottom:4px;">증축이력 서식.pptx</div>
-          <div style="font-size:12px;color:#7a7a7a;">PPT 템플릿 · 필수 파일</div>
-        </a>
+      <div class="research-tabs">
+        <button class="research-tab active" onclick="hwpxSwitchSubTab('report')">보고서 작성</button>
+        <button class="research-tab" onclick="hwpxSwitchSubTab('dxf')">증축이력 조사</button>
       </div>
 
-      <div style="background:#fff;border-radius:18px;border:1px solid #e0e0e0;padding:32px;max-width:640px;margin:0 auto;">
-        <div style="font-size:15px;font-weight:700;color:#1d1d1f;margin-bottom:20px;">사용 방법</div>
-        <div style="display:flex;flex-direction:column;gap:16px;">
-          <div style="display:flex;gap:16px;align-items:flex-start;">
-            <div style="width:28px;height:28px;border-radius:50%;background:#f5f5f7;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#0066cc;flex-shrink:0;">1</div>
-            <div><div style="font-size:14px;font-weight:600;color:#1d1d1f;">두 파일을 같은 폴더에 저장</div><div style="font-size:13px;color:#7a7a7a;margin-top:2px;">DXF2PPT.exe와 증축이력 서식.pptx를 같은 위치에 두세요</div></div>
+      <!-- Sub-tab 1: 보고서 작성 (HWPX) -->
+      <div id="research-sub-report" class="research-subtab active">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:640px;margin:0 auto 32px;">
+          <div id="hwpx-template-zone" style="background:#fff;border-radius:18px;border:2px dashed #d0d0d0;padding:40px 24px;text-align:center;cursor:pointer;transition:all .2s;" onclick="document.getElementById('hwpx-template').click()" ondragover="event.preventDefault();this.style.borderColor='#0066cc';this.style.background='#f0f6ff'" ondragleave="this.style.borderColor='#d0d0d0';this.style.background='#fff'" ondrop="event.preventDefault();this.style.borderColor='#d0d0d0';this.style.background='#fff';hwpxHandleTemplate(event.dataTransfer.files[0])">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#0066cc" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:12px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <div style="font-size:15px;font-weight:600;color:#1d1d1f;margin-bottom:4px;">HWPX 템플릿</div>
+            <div id="hwpx-template-name" style="font-size:12px;color:#7a7a7a;">클릭 또는 드래그하여 업로드</div>
+            <input type="file" id="hwpx-template" accept=".hwpx" style="display:none" onchange="hwpxHandleTemplate(this.files[0])">
           </div>
-          <div style="display:flex;gap:16px;align-items:flex-start;">
-            <div style="width:28px;height:28px;border-radius:50%;background:#f5f5f7;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#0066cc;flex-shrink:0;">2</div>
-            <div><div style="font-size:14px;font-weight:600;color:#1d1d1f;">DXF2PPT.exe 실행</div><div style="font-size:13px;color:#7a7a7a;margin-top:2px;">프로그램을 더블클릭하여 실행합니다</div></div>
+          <div id="hwpx-excel-zone" style="background:#fff;border-radius:18px;border:2px dashed #d0d0d0;padding:40px 24px;text-align:center;cursor:pointer;transition:all .2s;" onclick="document.getElementById('hwpx-excel').click()" ondragover="event.preventDefault();this.style.borderColor='#059669';this.style.background='#f0fdf4'" ondragleave="this.style.borderColor='#d0d0d0';this.style.background='#fff'" ondrop="event.preventDefault();this.style.borderColor='#d0d0d0';this.style.background='#fff';hwpxHandleExcel(event.dataTransfer.files[0])">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:12px;"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
+            <div style="font-size:15px;font-weight:600;color:#1d1d1f;margin-bottom:4px;">Excel 데이터</div>
+            <div id="hwpx-excel-name" style="font-size:12px;color:#7a7a7a;">클릭 또는 드래그하여 업로드</div>
+            <input type="file" id="hwpx-excel" accept=".xlsx,.xls" style="display:none" onchange="hwpxHandleExcel(this.files[0])">
           </div>
-          <div style="display:flex;gap:16px;align-items:flex-start;">
-            <div style="width:28px;height:28px;border-radius:50%;background:#f5f5f7;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#0066cc;flex-shrink:0;">3</div>
-            <div><div style="font-size:14px;font-weight:600;color:#1d1d1f;">DXF 파일 선택 → PPT 자동 생성</div><div style="font-size:13px;color:#7a7a7a;margin-top:2px;">증축이력 도면(DXF)을 선택하면 PPT가 자동으로 만들어집니다</div></div>
+        </div>
+        <div style="text-align:center;margin-bottom:24px;">
+          <button id="hwpx-run-btn" disabled onclick="hwpxRun()" style="background:#0066cc;color:#fff;border:none;border-radius:9999px;padding:14px 48px;font-size:16px;font-weight:600;cursor:pointer;font-family:inherit;opacity:.4;transition:all .2s;">자동 작성 시작</button>
+        </div>
+        <div id="hwpx-status" style="max-width:640px;margin:0 auto 16px;padding:12px 16px;border-radius:12px;background:#f5f5f7;font-size:13px;color:#7a7a7a;text-align:center;display:none;"></div>
+        <div id="hwpx-log" style="max-width:640px;margin:0 auto;background:#1d1d1f;border-radius:14px;padding:20px;font-family:'SF Mono',Menlo,monospace;font-size:12px;color:#a0a0a0;max-height:300px;overflow-y:auto;display:none;"></div>
+      </div>
+
+      <!-- Sub-tab 2: 증축이력 조사 (DXF2PPT) -->
+      <div id="research-sub-dxf" class="research-subtab">
+        <div style="text-align:center;margin-bottom:48px;">
+          <div style="font-size:17px;color:#7a7a7a;line-height:1.47;">DXF 도면을 분석하여 증축이력 PPT를 자동으로 생성합니다.</div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:640px;margin:0 auto 48px;">
+          <a href="https://github.com/yun9473/dxf2ppt-api/releases/download/v1.0.0/DXF2PPT.exe" style="background:#0066cc;border-radius:18px;padding:32px 24px;text-align:center;text-decoration:none;transition:all .2s;display:block;" onmouseenter="this.style.opacity='0.9'" onmouseleave="this.style.opacity='1'">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:12px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <div style="font-size:17px;font-weight:600;color:#fff;margin-bottom:4px;">DXF2PPT.exe</div>
+            <div style="font-size:12px;color:rgba(255,255,255,.7);">Windows 전용 · 57MB</div>
+          </a>
+          <a href="https://github.com/yun9473/dxf2ppt-api/releases/download/v1.0.0/default.pptx" style="background:#fff;border-radius:18px;border:1px solid #e0e0e0;padding:32px 24px;text-align:center;text-decoration:none;transition:all .2s;display:block;" onmouseenter="this.style.borderColor='#0066cc'" onmouseleave="this.style.borderColor='#e0e0e0'">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#0066cc" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:12px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <div style="font-size:17px;font-weight:600;color:#1d1d1f;margin-bottom:4px;">증축이력 서식.pptx</div>
+            <div style="font-size:12px;color:#7a7a7a;">PPT 템플릿 · 필수 파일</div>
+          </a>
+        </div>
+
+        <div style="background:#fff;border-radius:18px;border:1px solid #e0e0e0;padding:32px;max-width:640px;margin:0 auto;">
+          <div style="font-size:15px;font-weight:700;color:#1d1d1f;margin-bottom:20px;">사용 방법</div>
+          <div style="display:flex;flex-direction:column;gap:16px;">
+            <div style="display:flex;gap:16px;align-items:flex-start;">
+              <div style="width:28px;height:28px;border-radius:50%;background:#f5f5f7;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#0066cc;flex-shrink:0;">1</div>
+              <div><div style="font-size:14px;font-weight:600;color:#1d1d1f;">두 파일을 같은 폴더에 저장</div><div style="font-size:13px;color:#7a7a7a;margin-top:2px;">DXF2PPT.exe와 증축이력 서식.pptx를 같은 위치에 두세요</div></div>
+            </div>
+            <div style="display:flex;gap:16px;align-items:flex-start;">
+              <div style="width:28px;height:28px;border-radius:50%;background:#f5f5f7;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#0066cc;flex-shrink:0;">2</div>
+              <div><div style="font-size:14px;font-weight:600;color:#1d1d1f;">DXF2PPT.exe 실행</div><div style="font-size:13px;color:#7a7a7a;margin-top:2px;">프로그램을 더블클릭하여 실행합니다</div></div>
+            </div>
+            <div style="display:flex;gap:16px;align-items:flex-start;">
+              <div style="width:28px;height:28px;border-radius:50%;background:#f5f5f7;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#0066cc;flex-shrink:0;">3</div>
+              <div><div style="font-size:14px;font-weight:600;color:#1d1d1f;">DXF 파일 선택 → PPT 자동 생성</div><div style="font-size:13px;color:#7a7a7a;margin-top:2px;">증축이력 도면(DXF)을 선택하면 PPT가 자동으로 만들어집니다</div></div>
+            </div>
           </div>
         </div>
       </div>
+
     </div>
   </div>
 
@@ -2683,10 +2726,10 @@ function enterModule(mod){
   document.querySelectorAll('.module-panel').forEach(function(p){p.classList.remove('active');});
   if(mod==='dashboard'){
     document.getElementById('nav-dashboard').click();
-  } else if(mod==='dxf2ppt'){
-    document.getElementById('module-dxf2ppt').classList.add('active');
+  } else if(mod==='research'){
+    document.getElementById('module-research').classList.add('active');
     document.querySelectorAll('.integrated-nav .nav-item').forEach(function(b){b.classList.remove('active');});
-    dxfLoadHistory();
+    document.getElementById('nav-research').classList.add('active');
   } else {
     document.getElementById('nav-upload').click();
   }
@@ -2717,7 +2760,7 @@ async function startApp(label){
   document.getElementById('tu').textContent=label;
   if(role==='admin') document.getElementById('mi-admin').style.display='flex';
   document.getElementById('nav-dashboard').style.display=(role==='admin')?'':'none';
-  document.getElementById('nav-dxf2ppt').style.display=(role==='admin')?'':'none';
+  document.getElementById('nav-research').style.display=(role==='admin')?'':'none';
   if(role==='agency'||role==='admin'){ document.getElementById('ag-tabs').style.display='block'; switchAgTab('bulk'); }
   if(role==='school'){
     document.getElementById('school-info-box').style.display='block';
@@ -2752,7 +2795,7 @@ function logout(){
   document.getElementById('lp-admin-proj').style.display='none';
   document.getElementById('mi-admin').style.display='none';
   document.getElementById('nav-dashboard').style.display='none';
-  document.getElementById('nav-dxf2ppt').style.display='none';
+  document.getElementById('nav-research').style.display='none';
   document.getElementById('nav-upload').click();
   document.getElementById('ag-tabs').style.display='none';
   document.getElementById('school-info-box').style.display='none';
@@ -6384,6 +6427,507 @@ async function dxfLoadHistory(){
   }catch(e){}
 }
 // ════════════ end dxf2ppt ════════════
+
+// ════════════ HWPX 보고서 자동 작성 ════════════
+var hwpxTemplateZip = null;
+var hwpxExcelWb = null;
+
+function hwpxSwitchSubTab(tab) {
+  document.querySelectorAll('.research-tab').forEach(function(b){ b.classList.remove('active'); });
+  document.querySelectorAll('.research-subtab').forEach(function(p){ p.classList.remove('active'); });
+  if (tab === 'report') {
+    document.querySelector('.research-tab:first-child').classList.add('active');
+    document.getElementById('research-sub-report').classList.add('active');
+  } else {
+    document.querySelector('.research-tab:last-child').classList.add('active');
+    document.getElementById('research-sub-dxf').classList.add('active');
+  }
+}
+
+function hwpxHandleTemplate(file) {
+  if (!file) return;
+  document.getElementById('hwpx-template-name').textContent = file.name;
+  document.getElementById('hwpx-template-zone').style.borderColor = '#0066cc';
+  document.getElementById('hwpx-template-zone').style.borderStyle = 'solid';
+  JSZip.loadAsync(file).then(function(zip) {
+    hwpxTemplateZip = zip;
+    hwpxLog('템플릿 로드 완료: ' + file.name);
+    hwpxCheckReady();
+  }).catch(function(e) {
+    hwpxLog('템플릿 로드 실패: ' + e.message);
+  });
+}
+
+function hwpxHandleExcel(file) {
+  if (!file) return;
+  document.getElementById('hwpx-excel-name').textContent = file.name;
+  document.getElementById('hwpx-excel-zone').style.borderColor = '#059669';
+  document.getElementById('hwpx-excel-zone').style.borderStyle = 'solid';
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      hwpxExcelWb = XLSX.read(e.target.result, {type:'array'});
+      hwpxLog('Excel 로드 완료: ' + file.name + ' (시트 ' + hwpxExcelWb.SheetNames.length + '개)');
+      hwpxCheckReady();
+    } catch(err) {
+      hwpxLog('Excel 로드 실패: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function hwpxCheckReady() {
+  var btn = document.getElementById('hwpx-run-btn');
+  if (hwpxTemplateZip && hwpxExcelWb) {
+    btn.disabled = false;
+    btn.style.opacity = '1';
+  } else {
+    btn.disabled = true;
+    btn.style.opacity = '.4';
+  }
+}
+
+function hwpxLog(msg) {
+  var el = document.getElementById('hwpx-log');
+  el.style.display = 'block';
+  var line = document.createElement('div');
+  line.textContent = '[' + new Date().toLocaleTimeString('ko-KR') + '] ' + msg;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+
+function hwpxSetStatus(type, msg) {
+  var el = document.getElementById('hwpx-status');
+  el.style.display = 'block';
+  if (type === 'done') { el.style.background = '#ECFDF5'; el.style.color = '#065F46'; }
+  else if (type === 'error') { el.style.background = '#FEF2F2'; el.style.color = '#991B1B'; }
+  else { el.style.background = '#FEF3C7'; el.style.color = '#92400E'; }
+  el.textContent = msg;
+}
+
+// ── HWPX XML Utilities ──
+var HWPX_HP = 'http://www.hancom.co.kr/hwpml/2011/paragraph';
+var HWPX_XML_DECL = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+
+function hwpx_parseXML(str) {
+  return new DOMParser().parseFromString(str, 'application/xml');
+}
+function hwpx_serializeXML(doc) {
+  return HWPX_XML_DECL + new XMLSerializer().serializeToString(doc.documentElement);
+}
+function hwpx_xpathAll(doc, expr, ctx) {
+  var res = doc.evaluate(expr, ctx || doc, function(prefix) {
+    if (prefix === 'hp') return HWPX_HP;
+    return null;
+  }, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+  var arr = [];
+  for (var i = 0; i < res.snapshotLength; i++) arr.push(res.snapshotItem(i));
+  return arr;
+}
+function hwpx_getTcs(tr) { return hwpx_xpathAll(tr.ownerDocument, 'hp:tc', tr); }
+function hwpx_getTrs(tbl) { return hwpx_xpathAll(tbl.ownerDocument, 'hp:tr', tbl); }
+function hwpx_getTbls(doc) { return hwpx_xpathAll(doc, '//hp:tbl'); }
+function hwpx_getTexts(node) {
+  var arr = hwpx_xpathAll(node.ownerDocument, './/hp:t', node);
+  return arr.map(function(t){ return t.textContent; }).join('');
+}
+
+function hwpx_removeLinesegarray(tc) {
+  var ls = hwpx_xpathAll(tc.ownerDocument, './/hp:linesegarray', tc);
+  ls.forEach(function(n){ n.parentNode.removeChild(n); });
+}
+
+function hwpx_setCellText(tc, text) {
+  hwpx_removeLinesegarray(tc);
+  var tNodes = hwpx_xpathAll(tc.ownerDocument, './/hp:t', tc);
+  if (tNodes.length > 0) {
+    tNodes[0].textContent = String(text);
+    for (var i = 1; i < tNodes.length; i++) {
+      tNodes[i].textContent = '';
+    }
+  }
+}
+
+function hwpx_clearRow(tr) {
+  var tcs = hwpx_getTcs(tr);
+  tcs.forEach(function(tc){ hwpx_setCellText(tc, ''); });
+}
+
+function hwpx_fmtComma(n) {
+  if (n == null || isNaN(n)) return '';
+  return Number(n).toLocaleString('ko-KR');
+}
+function hwpx_fmtNum(v) {
+  if (v == null || v === '') return '';
+  var n = Number(v);
+  return isNaN(n) ? String(v) : n.toLocaleString('ko-KR');
+}
+function hwpx_fmt2(v) {
+  if (v == null || v === '') return '';
+  var n = Number(v);
+  return isNaN(n) ? String(v) : n.toFixed(2);
+}
+
+// ── Excel parsing helpers ──
+function hwpx_sheetToRows(wb, name) {
+  var s = wb.Sheets[name];
+  if (!s) return [];
+  return XLSX.utils.sheet_to_json(s, {header:1, defval:''});
+}
+function hwpx_cellVal(rows, r, c) {
+  if (!rows[r]) return '';
+  var v = rows[r][c];
+  return (v == null) ? '' : v;
+}
+
+function hwpx_parseOverview(wb) {
+  var rows = hwpx_sheetToRows(wb, '총괄');
+  if (!rows.length) return null;
+  return {
+    schoolName: hwpx_cellVal(rows,1,1),
+    address: hwpx_cellVal(rows,2,1),
+    principal: hwpx_cellVal(rows,3,1),
+    phone: hwpx_cellVal(rows,4,1),
+    totalArea: hwpx_cellVal(rows,5,1),
+    buildingCount: hwpx_cellVal(rows,6,1),
+    studentCount: hwpx_cellVal(rows,7,1),
+    classCount: hwpx_cellVal(rows,8,1),
+    established: hwpx_cellVal(rows,9,1)
+  };
+}
+
+function hwpx_parseFacility(wb) {
+  var rows = hwpx_sheetToRows(wb, '시설현황');
+  var data = [];
+  for (var i = 1; i < rows.length; i++) {
+    if (!rows[i][0] && !rows[i][1]) continue;
+    data.push({
+      building: hwpx_cellVal(rows,i,0),
+      floor: hwpx_cellVal(rows,i,1),
+      room: hwpx_cellVal(rows,i,2),
+      area: hwpx_cellVal(rows,i,3),
+      use: hwpx_cellVal(rows,i,4),
+      year: hwpx_cellVal(rows,i,5),
+      structure: hwpx_cellVal(rows,i,6),
+      condition: hwpx_cellVal(rows,i,7)
+    });
+  }
+  return data;
+}
+
+function hwpx_parseComposition(wb) {
+  var rows = hwpx_sheetToRows(wb, '구성비');
+  var data = [];
+  for (var i = 1; i < rows.length; i++) {
+    if (!rows[i][0] && !rows[i][1]) continue;
+    data.push({
+      category: hwpx_cellVal(rows,i,0),
+      item: hwpx_cellVal(rows,i,1),
+      area: hwpx_cellVal(rows,i,2),
+      ratio: hwpx_cellVal(rows,i,3)
+    });
+  }
+  return data;
+}
+
+function hwpx_parseExtension(wb) {
+  var rows = hwpx_sheetToRows(wb, '증축이력');
+  var data = [];
+  for (var i = 1; i < rows.length; i++) {
+    if (!rows[i][0] && !rows[i][1]) continue;
+    data.push({
+      year: hwpx_cellVal(rows,i,0),
+      building: hwpx_cellVal(rows,i,1),
+      type: hwpx_cellVal(rows,i,2),
+      area: hwpx_cellVal(rows,i,3),
+      note: hwpx_cellVal(rows,i,4)
+    });
+  }
+  return data;
+}
+
+function hwpx_parseInvestment(wb) {
+  var rows = hwpx_sheetToRows(wb, '투자');
+  var data = [];
+  for (var i = 1; i < rows.length; i++) {
+    if (!rows[i][0] && !rows[i][1]) continue;
+    data.push({
+      year: hwpx_cellVal(rows,i,0),
+      project: hwpx_cellVal(rows,i,1),
+      amount: hwpx_cellVal(rows,i,2),
+      source: hwpx_cellVal(rows,i,3),
+      note: hwpx_cellVal(rows,i,4)
+    });
+  }
+  return data;
+}
+
+function hwpx_parseLCC(wb) {
+  var rows = hwpx_sheetToRows(wb, 'LCC');
+  var data = [];
+  for (var i = 1; i < rows.length; i++) {
+    if (!rows[i][0] && !rows[i][1]) continue;
+    data.push({
+      item: hwpx_cellVal(rows,i,0),
+      cost: hwpx_cellVal(rows,i,1),
+      period: hwpx_cellVal(rows,i,2),
+      annual: hwpx_cellVal(rows,i,3)
+    });
+  }
+  return data;
+}
+
+function hwpx_parseStructConclusion(wb) {
+  var rows = hwpx_sheetToRows(wb, '구조결론');
+  if (!rows.length || rows.length < 2) return null;
+  return {
+    grade: hwpx_cellVal(rows,1,0),
+    conclusion: hwpx_cellVal(rows,1,1),
+    recommendation: hwpx_cellVal(rows,1,2)
+  };
+}
+
+function hwpx_parseEvalData(wb) {
+  var rows = hwpx_sheetToRows(wb, '평가');
+  var data = [];
+  for (var i = 1; i < rows.length; i++) {
+    if (!rows[i][0] && !rows[i][1]) continue;
+    data.push({
+      category: hwpx_cellVal(rows,i,0),
+      item: hwpx_cellVal(rows,i,1),
+      score: hwpx_cellVal(rows,i,2),
+      maxScore: hwpx_cellVal(rows,i,3),
+      note: hwpx_cellVal(rows,i,4)
+    });
+  }
+  return data;
+}
+
+// ── Table search & fill helpers ──
+function hwpx_findTableByText(tbls, keyword) {
+  for (var i = 0; i < tbls.length; i++) {
+    if (hwpx_getTexts(tbls[i]).indexOf(keyword) >= 0) return tbls[i];
+  }
+  return null;
+}
+
+function hwpx_findTableByPattern(tbls, patterns) {
+  for (var i = 0; i < tbls.length; i++) {
+    var txt = hwpx_getTexts(tbls[i]);
+    var found = true;
+    for (var j = 0; j < patterns.length; j++) {
+      if (txt.indexOf(patterns[j]) < 0) { found = false; break; }
+    }
+    if (found) return tbls[i];
+  }
+  return null;
+}
+
+function hwpx_replaceTexts(doc, replacements) {
+  var tNodes = hwpx_xpathAll(doc, '//hp:t');
+  tNodes.forEach(function(t) {
+    var text = t.textContent;
+    for (var key in replacements) {
+      if (text.indexOf(key) >= 0) {
+        text = text.split(key).join(String(replacements[key]));
+      }
+    }
+    t.textContent = text;
+  });
+}
+
+function hwpx_fillSchoolTable(doc, overview) {
+  if (!overview) return;
+  hwpx_replaceTexts(doc, {
+    '{{학교명}}': overview.schoolName || '',
+    '{{주소}}': overview.address || '',
+    '{{교장}}': overview.principal || '',
+    '{{전화}}': overview.phone || '',
+    '{{총면적}}': hwpx_fmtComma(overview.totalArea),
+    '{{건물수}}': overview.buildingCount || '',
+    '{{학생수}}': hwpx_fmtComma(overview.studentCount),
+    '{{학급수}}': overview.classCount || '',
+    '{{설립일}}': overview.established || ''
+  });
+}
+
+function hwpx_fillFacilityTable(tbls, facilities) {
+  var tbl = hwpx_findTableByText(tbls, '시설현황') || hwpx_findTableByPattern(tbls, ['동','층','실']);
+  if (!tbl || !facilities.length) return;
+  var trs = hwpx_getTrs(tbl);
+  for (var i = 0; i < facilities.length && i + 1 < trs.length; i++) {
+    var tcs = hwpx_getTcs(trs[i + 1]);
+    var f = facilities[i];
+    if (tcs[0]) hwpx_setCellText(tcs[0], f.building);
+    if (tcs[1]) hwpx_setCellText(tcs[1], f.floor);
+    if (tcs[2]) hwpx_setCellText(tcs[2], f.room);
+    if (tcs[3]) hwpx_setCellText(tcs[3], hwpx_fmtNum(f.area));
+    if (tcs[4]) hwpx_setCellText(tcs[4], f.use);
+    if (tcs[5]) hwpx_setCellText(tcs[5], f.year);
+    if (tcs[6]) hwpx_setCellText(tcs[6], f.structure);
+    if (tcs[7]) hwpx_setCellText(tcs[7], f.condition);
+  }
+}
+
+function hwpx_fillCompositionTable(tbls, data) {
+  var tbl = hwpx_findTableByText(tbls, '구성비') || hwpx_findTableByPattern(tbls, ['구분','면적','비율']);
+  if (!tbl || !data.length) return;
+  var trs = hwpx_getTrs(tbl);
+  for (var i = 0; i < data.length && i + 1 < trs.length; i++) {
+    var tcs = hwpx_getTcs(trs[i + 1]);
+    var d = data[i];
+    if (tcs[0]) hwpx_setCellText(tcs[0], d.category);
+    if (tcs[1]) hwpx_setCellText(tcs[1], d.item);
+    if (tcs[2]) hwpx_setCellText(tcs[2], hwpx_fmtNum(d.area));
+    if (tcs[3]) hwpx_setCellText(tcs[3], hwpx_fmt2(d.ratio));
+  }
+}
+
+function hwpx_fillInvestmentTable(tbls, data) {
+  var tbl = hwpx_findTableByText(tbls, '투자') || hwpx_findTableByPattern(tbls, ['연도','사업','금액']);
+  if (!tbl || !data.length) return;
+  var trs = hwpx_getTrs(tbl);
+  for (var i = 0; i < data.length && i + 1 < trs.length; i++) {
+    var tcs = hwpx_getTcs(trs[i + 1]);
+    var d = data[i];
+    if (tcs[0]) hwpx_setCellText(tcs[0], d.year);
+    if (tcs[1]) hwpx_setCellText(tcs[1], d.project);
+    if (tcs[2]) hwpx_setCellText(tcs[2], hwpx_fmtComma(d.amount));
+    if (tcs[3]) hwpx_setCellText(tcs[3], d.source);
+    if (tcs[4]) hwpx_setCellText(tcs[4], d.note);
+  }
+}
+
+function hwpx_fillEvalTable(tbls, data) {
+  var tbl = hwpx_findTableByText(tbls, '평가') || hwpx_findTableByPattern(tbls, ['항목','점수','배점']);
+  if (!tbl || !data.length) return;
+  var trs = hwpx_getTrs(tbl);
+  for (var i = 0; i < data.length && i + 1 < trs.length; i++) {
+    var tcs = hwpx_getTcs(trs[i + 1]);
+    var d = data[i];
+    if (tcs[0]) hwpx_setCellText(tcs[0], d.category);
+    if (tcs[1]) hwpx_setCellText(tcs[1], d.item);
+    if (tcs[2]) hwpx_setCellText(tcs[2], hwpx_fmtNum(d.score));
+    if (tcs[3]) hwpx_setCellText(tcs[3], hwpx_fmtNum(d.maxScore));
+    if (tcs[4]) hwpx_setCellText(tcs[4], d.note);
+  }
+}
+
+function hwpx_fillStructTable(tbls, struct) {
+  if (!struct) return;
+  var tbl = hwpx_findTableByText(tbls, '구조') || hwpx_findTableByPattern(tbls, ['등급','결론']);
+  if (!tbl) return;
+  hwpx_replaceTexts(tbl.ownerDocument, {
+    '{{등급}}': struct.grade || '',
+    '{{결론}}': struct.conclusion || '',
+    '{{권고}}': struct.recommendation || ''
+  });
+}
+
+function hwpx_clearStructTable(tbls) {
+  // no-op placeholder
+}
+
+function hwpx_fillLCCTable(tbls, data) {
+  var tbl = hwpx_findTableByText(tbls, 'LCC') || hwpx_findTableByPattern(tbls, ['항목','비용','기간']);
+  if (!tbl || !data.length) return;
+  var trs = hwpx_getTrs(tbl);
+  for (var i = 0; i < data.length && i + 1 < trs.length; i++) {
+    var tcs = hwpx_getTcs(trs[i + 1]);
+    var d = data[i];
+    if (tcs[0]) hwpx_setCellText(tcs[0], d.item);
+    if (tcs[1]) hwpx_setCellText(tcs[1], hwpx_fmtComma(d.cost));
+    if (tcs[2]) hwpx_setCellText(tcs[2], d.period);
+    if (tcs[3]) hwpx_setCellText(tcs[3], hwpx_fmtComma(d.annual));
+  }
+}
+
+function hwpx_fillStudentTable(tbls, overview) {
+  // Uses overview data - placeholder for student-specific table
+}
+
+function hwpx_fillExtensionTable(tbls, data) {
+  var tbl = hwpx_findTableByText(tbls, '증축') || hwpx_findTableByPattern(tbls, ['연도','동','유형']);
+  if (!tbl || !data.length) return;
+  var trs = hwpx_getTrs(tbl);
+  for (var i = 0; i < data.length && i + 1 < trs.length; i++) {
+    var tcs = hwpx_getTcs(trs[i + 1]);
+    var d = data[i];
+    if (tcs[0]) hwpx_setCellText(tcs[0], d.year);
+    if (tcs[1]) hwpx_setCellText(tcs[1], d.building);
+    if (tcs[2]) hwpx_setCellText(tcs[2], d.type);
+    if (tcs[3]) hwpx_setCellText(tcs[3], hwpx_fmtNum(d.area));
+    if (tcs[4]) hwpx_setCellText(tcs[4], d.note);
+  }
+}
+
+// ── Main HWPX Run ──
+async function hwpxRun() {
+  if (!hwpxTemplateZip || !hwpxExcelWb) return;
+  var btn = document.getElementById('hwpx-run-btn');
+  btn.disabled = true; btn.style.opacity = '.4'; btn.textContent = '처리 중...';
+  hwpxSetStatus('working', '보고서 생성 중...');
+
+  try {
+    // Parse all Excel sheets
+    var overview = hwpx_parseOverview(hwpxExcelWb);
+    var facilities = hwpx_parseFacility(hwpxExcelWb);
+    var composition = hwpx_parseComposition(hwpxExcelWb);
+    var extensions = hwpx_parseExtension(hwpxExcelWb);
+    var investments = hwpx_parseInvestment(hwpxExcelWb);
+    var lcc = hwpx_parseLCC(hwpxExcelWb);
+    var struct = hwpx_parseStructConclusion(hwpxExcelWb);
+    var evalData = hwpx_parseEvalData(hwpxExcelWb);
+
+    hwpxLog('Excel 파싱 완료 — 시설 ' + facilities.length + '건, 증축 ' + extensions.length + '건');
+
+    // Process each section XML in the HWPX zip
+    var sectionFiles = [];
+    hwpxTemplateZip.forEach(function(path) {
+      if (path.match(/Contents\/section\d+\.xml$/i)) sectionFiles.push(path);
+    });
+    hwpxLog('HWPX 섹션 파일 ' + sectionFiles.length + '개 발견');
+
+    for (var si = 0; si < sectionFiles.length; si++) {
+      var path = sectionFiles[si];
+      var xml = await hwpxTemplateZip.file(path).async('string');
+      var doc = hwpx_parseXML(xml);
+      var tbls = hwpx_getTbls(doc);
+
+      hwpx_fillSchoolTable(doc, overview);
+      hwpx_fillFacilityTable(tbls, facilities);
+      hwpx_fillCompositionTable(tbls, composition);
+      hwpx_fillExtensionTable(tbls, extensions);
+      hwpx_fillInvestmentTable(tbls, investments);
+      hwpx_fillLCCTable(tbls, lcc);
+      hwpx_fillStructTable(tbls, struct);
+      hwpx_fillEvalTable(tbls, evalData);
+      hwpx_fillStudentTable(tbls, overview);
+
+      var out = hwpx_serializeXML(doc);
+      hwpxTemplateZip.file(path, out);
+      hwpxLog('섹션 처리 완료: ' + path);
+    }
+
+    // Generate output HWPX
+    var blob = await hwpxTemplateZip.generateAsync({type:'blob', mimeType:'application/hwpx'});
+    var schoolName = (overview && overview.schoolName) ? overview.schoolName : '보고서';
+    var fname = schoolName + '_보고서.hwpx';
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = fname; a.click();
+    URL.revokeObjectURL(url);
+
+    hwpxLog('완료: ' + fname + ' 다운로드');
+    hwpxSetStatus('done', '보고서 생성 완료: ' + fname);
+  } catch(e) {
+    hwpxLog('오류: ' + e.message);
+    hwpxSetStatus('error', '생성 실패: ' + e.message);
+  }
+
+  btn.disabled = false; btn.style.opacity = '1'; btn.textContent = '자동 작성 시작';
+}
+// ════════════ end HWPX ════════════
 
 
 </script>
