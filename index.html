@@ -595,6 +595,7 @@ table.dtable tbody tr{cursor:pointer;}
   <div class="integrated-nav">
     <button class="nav-item active" id="nav-upload" onclick="switchModule('upload',this)"> 기초자료 수신 관리</button>
     <button class="nav-item" id="nav-dashboard" onclick="switchModule('dashboard',this)"> 개축타당성 데이터베이스</button>
+    <button class="nav-item" id="nav-dxf2ppt" style="display:none" onclick="switchModule('dxf2ppt',this)"> 증축이력 PPT</button>
   </div>
 
   <!-- Module: Upload System -->
@@ -2712,6 +2713,7 @@ async function startApp(label){
   document.getElementById('tu').textContent=label;
   if(role==='admin') document.getElementById('mi-admin').style.display='flex';
   document.getElementById('nav-dashboard').style.display=(role==='admin')?'':'none';
+  document.getElementById('nav-dxf2ppt').style.display=(role==='admin')?'':'none';
   if(role==='agency'||role==='admin'){ document.getElementById('ag-tabs').style.display='block'; switchAgTab('bulk'); }
   if(role==='school'){
     document.getElementById('school-info-box').style.display='block';
@@ -2746,6 +2748,7 @@ function logout(){
   document.getElementById('lp-admin-proj').style.display='none';
   document.getElementById('mi-admin').style.display='none';
   document.getElementById('nav-dashboard').style.display='none';
+  document.getElementById('nav-dxf2ppt').style.display='none';
   document.getElementById('nav-upload').click();
   document.getElementById('ag-tabs').style.display='none';
   document.getElementById('school-info-box').style.display='none';
