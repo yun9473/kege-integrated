@@ -1997,36 +1997,42 @@ table.dtable tbody tr{cursor:pointer;}
 
   <!-- DXF2PPT MODULE -->
   <div id="module-dxf2ppt" class="module-panel">
-    <div style="max-width:800px;margin:0 auto;padding:32px 24px;">
-      <div style="margin-bottom:24px;">
-        <div style="font-size:12px;font-weight:600;color:#0066cc;letter-spacing:.08em;margin-bottom:6px;">DXF2PPT</div>
-        <div style="font-size:28px;font-weight:800;color:#1d1d1f;letter-spacing:-.04em;">증축이력 PPT 생성</div>
-        <div style="font-size:14px;color:#7a7a7a;margin-top:4px;">DXF 도면을 업로드하면 증축이력 PPT를 자동 생성합니다.</div>
+    <div style="max-width:800px;margin:0 auto;padding:80px 24px 48px;">
+      <div style="text-align:center;margin-bottom:48px;">
+        <div style="font-size:12px;font-weight:600;color:#0066cc;letter-spacing:.08em;margin-bottom:8px;">DXF2PPT</div>
+        <div style="font-size:40px;font-weight:600;color:#1d1d1f;letter-spacing:0;line-height:1.1;">증축이력 PPT 생성</div>
+        <div style="font-size:17px;color:#7a7a7a;margin-top:12px;line-height:1.47;">DXF 도면을 분석하여 증축이력 PPT를 자동으로 생성합니다.</div>
       </div>
 
-      <div style="background:#fff;border-radius:18px;border:1px solid #e0e0e0;padding:28px;margin-bottom:20px;">
-        <div style="font-size:15px;font-weight:700;color:#1d1d1f;margin-bottom:16px;">DXF 파일 업로드</div>
-        <div id="dxf-drop" style="border:2px dashed #e0e0e0;border-radius:12px;padding:48px 24px;text-align:center;cursor:pointer;transition:all .2s;" onclick="document.getElementById('dxf-file').click()" onmouseenter="this.style.borderColor='#0066cc'" onmouseleave="this.style.borderColor=dxfFile?'#1B6B3C':'#e0e0e0'">
-          <div style="font-size:36px;margin-bottom:10px;opacity:.6;">&#x1F4D0;</div>
-          <div style="font-size:14px;color:#7a7a7a;"><span style="color:#0066cc;font-weight:600;">클릭</span>하거나 DXF 파일을 <span style="color:#0066cc;font-weight:600;">드래그</span>하세요</div>
-          <div id="dxf-filename" style="font-size:13px;color:#1B6B3C;font-weight:600;margin-top:8px;"></div>
-          <input type="file" id="dxf-file" accept=".dxf" style="display:none" onchange="dxfSelect(this.files[0])">
-        </div>
-        <div style="margin-top:16px;">
-          <label style="font-size:13px;font-weight:600;color:#7a7a7a;display:block;margin-bottom:6px;">프로젝트 제목</label>
-          <input type="text" id="dxf-title" placeholder="학교명 동명 (예: 삼일고 1동)" style="width:100%;padding:12px 16px;border:1px solid #e0e0e0;border-radius:12px;font-size:14px;font-family:inherit;outline:none;" onfocus="this.style.borderColor='#0066cc'" onblur="this.style.borderColor='#e0e0e0'">
-        </div>
-        <button id="dxf-btn" onclick="dxfConvert()" disabled style="width:100%;margin-top:20px;padding:14px;background:#0066cc;color:#fff;border:none;border-radius:9999px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;opacity:.35;" onmousedown="if(!this.disabled)this.style.transform='scale(0.97)'" onmouseup="this.style.transform='none'">PPT 생성하기</button>
-        <div id="dxf-progress" style="display:none;margin-top:16px;">
-          <div style="height:4px;background:#f0f0f0;border-radius:2px;overflow:hidden;"><div id="dxf-progress-fill" style="height:100%;background:#0066cc;width:0%;transition:width .4s;border-radius:2px;"></div></div>
-          <div id="dxf-progress-text" style="font-size:12px;color:#7a7a7a;margin-top:4px;text-align:center;"></div>
-        </div>
-        <div id="dxf-status" style="display:none;padding:12px 16px;border-radius:12px;font-size:13px;margin-top:16px;"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:640px;margin:0 auto 48px;">
+        <a href="https://github.com/yun9473/dxf2ppt-api/releases/download/v1.0.0/DXF2PPT.exe" style="background:#0066cc;border-radius:18px;padding:32px 24px;text-align:center;text-decoration:none;transition:all .2s;display:block;" onmouseenter="this.style.opacity='0.9'" onmouseleave="this.style.opacity='1'">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:12px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <div style="font-size:17px;font-weight:600;color:#fff;margin-bottom:4px;">DXF2PPT.exe</div>
+          <div style="font-size:12px;color:rgba(255,255,255,.7);">Windows 전용 · 57MB</div>
+        </a>
+        <a href="https://github.com/yun9473/dxf2ppt-api/releases/download/v1.0.0/default.pptx" style="background:#fff;border-radius:18px;border:1px solid #e0e0e0;padding:32px 24px;text-align:center;text-decoration:none;transition:all .2s;display:block;" onmouseenter="this.style.borderColor='#0066cc'" onmouseleave="this.style.borderColor='#e0e0e0'">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#0066cc" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:12px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <div style="font-size:17px;font-weight:600;color:#1d1d1f;margin-bottom:4px;">증축이력 서식.pptx</div>
+          <div style="font-size:12px;color:#7a7a7a;">PPT 템플릿 · 필수 파일</div>
+        </a>
       </div>
 
-      <div style="background:#fff;border-radius:18px;border:1px solid #e0e0e0;padding:28px;">
-        <div style="font-size:15px;font-weight:700;color:#1d1d1f;margin-bottom:16px;">변환 이력</div>
-        <div id="dxf-history" style="color:#7a7a7a;font-size:13px;text-align:center;padding:24px;">아직 변환 이력이 없습니다</div>
+      <div style="background:#fff;border-radius:18px;border:1px solid #e0e0e0;padding:32px;max-width:640px;margin:0 auto;">
+        <div style="font-size:15px;font-weight:700;color:#1d1d1f;margin-bottom:20px;">사용 방법</div>
+        <div style="display:flex;flex-direction:column;gap:16px;">
+          <div style="display:flex;gap:16px;align-items:flex-start;">
+            <div style="width:28px;height:28px;border-radius:50%;background:#f5f5f7;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#0066cc;flex-shrink:0;">1</div>
+            <div><div style="font-size:14px;font-weight:600;color:#1d1d1f;">두 파일을 같은 폴더에 저장</div><div style="font-size:13px;color:#7a7a7a;margin-top:2px;">DXF2PPT.exe와 증축이력 서식.pptx를 같은 위치에 두세요</div></div>
+          </div>
+          <div style="display:flex;gap:16px;align-items:flex-start;">
+            <div style="width:28px;height:28px;border-radius:50%;background:#f5f5f7;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#0066cc;flex-shrink:0;">2</div>
+            <div><div style="font-size:14px;font-weight:600;color:#1d1d1f;">DXF2PPT.exe 실행</div><div style="font-size:13px;color:#7a7a7a;margin-top:2px;">프로그램을 더블클릭하여 실행합니다</div></div>
+          </div>
+          <div style="display:flex;gap:16px;align-items:flex-start;">
+            <div style="width:28px;height:28px;border-radius:50%;background:#f5f5f7;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#0066cc;flex-shrink:0;">3</div>
+            <div><div style="font-size:14px;font-weight:600;color:#1d1d1f;">DXF 파일 선택 → PPT 자동 생성</div><div style="font-size:13px;color:#7a7a7a;margin-top:2px;">증축이력 도면(DXF)을 선택하면 PPT가 자동으로 만들어집니다</div></div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
