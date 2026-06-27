@@ -7272,13 +7272,19 @@ var GeoCache = {
 };
 
 // ── MapManager ──
+var _mapInitedFlag = false;
+var _mapObj = null;
+var _mapClusterer = null;
+var _mapData = [];
+var _mapMarkers = [];
+var _mapGeoCache = {};
 var _mapInitPromise = null;
 function mapInitKakao() {
   if (_mapInitPromise) return _mapInitPromise;
   _mapInitPromise = new Promise(function(resolve) {
     function tryInit() {
-      console.log('mapInitKakao tryInit: kakao=' + (typeof kakao !== 'undefined') + ', _mapInited=' + _mapInited);
-      if (_mapInited && _mapObj && _mapClusterer) {
+      console.log('mapInitKakao tryInit: kakao=' + (typeof kakao !== 'undefined') + ', _mapInitedFlag=' + _mapInitedFlag);
+      if (_mapInitedFlag && _mapObj && _mapClusterer) {
         console.log('mapInitKakao: already initialized');
         resolve(); return;
       }
@@ -7313,7 +7319,7 @@ function mapInitKakao() {
             ]
           });
           mapInitMarkerImages();
-          _mapInited = true;
+          _mapInitedFlag = true;
           console.log('mapInitKakao: COMPLETE, _mapObj=', !!_mapObj, '_mapClusterer=', !!_mapClusterer);
           resolve();
         });
@@ -7820,7 +7826,7 @@ function mapUpdateStats() {
   mapUpdateStatsForViewport();
 }
 
-// mapUpdateStatsForViewport는 mapUpdateStatsFromCandidates로 대체됨
+function mapUpdateStatsForViewport() { mapUpdateViewport(); }
 
 function mapSwitchSub(view) {
   var mapView = document.getElementById('mapSubView-map');
