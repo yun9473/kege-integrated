@@ -4417,12 +4417,20 @@ async function emailDoSend(targets,subject,body,dday){
     var s=SCHOOLS.find(function(x){return x.id===item.sid;});
     var subj=subject.replace(/\{day\}/g,Math.abs(d)).replace(/\{school\}/g,s?s.school:'').replace(/\{deadline\}/g,deadlineStr).replace(/\{building\}/g,s?s.building:'');
     var bd=body.replace(/\{day\}/g,Math.abs(d)).replace(/\{school\}/g,s?s.school:'').replace(/\{deadline\}/g,deadlineStr).replace(/\{building\}/g,s?s.building:'');
+    // plain text → HTML 변환
+    var htmlBody = '<div style="font-family:\'Malgun Gothic\',\'맑은 고딕\',sans-serif;font-size:11pt;color:#333;line-height:1.8;">' +
+      bd.replace(/\n/g,'<br>')
+        .replace(/■\s*제출 마감일[：:]\s*([^\n<]+)/g,'<br><b style="font-size:13pt;color:#0066cc;">■ 제출 마감일: $1</b>')
+        .replace(/■\s*([^\n<]+)/g,'<b>■ $1</b>')
+        .replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" style="color:#0066cc;">$1</a>')
+        .replace(/(KEGE_1HQ@kege\.or\.kr)/g,'<a href="mailto:$1" style="color:#0066cc;">$1</a>') +
+      '</div>';
 
     try{
       var res = await fetch(paUrl,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({action:'sendEmail',to:item.email,subject:subj,body:bd,school:s?s.school:'',fileName:'email',folderPath:'email',fileContent:''})
+        body:JSON.stringify({action:'sendEmail',to:item.email,subject:subj,body:htmlBody,school:s?s.school:'',fileName:'email',folderPath:'email',fileContent:'',isHtml:true})
       });
       if(!res.ok){
         var errText = await res.text().catch(function(){return '';});
