@@ -4414,9 +4414,12 @@ async function emailDoSend(targets,subject,body,dday){
 
   for(var i=0;i<targets.length;i++){
     var item=targets[i];
-    var s=SCHOOLS.find(function(x){return x.id===item.sid;});
-    var subj=subject.replace(/\{day\}/g,Math.abs(d)).replace(/\{school\}/g,s?s.school:'').replace(/\{deadline\}/g,deadlineStr).replace(/\{building\}/g,s?s.building:'');
-    var bd=body.replace(/\{day\}/g,Math.abs(d)).replace(/\{school\}/g,s?s.school:'').replace(/\{deadline\}/g,deadlineStr).replace(/\{building\}/g,s?s.building:'');
+    var sid=parseInt(item.sid);
+    var s=SCHOOLS.find(function(x){return x.id===sid;});
+    var schoolName=s?s.school:'';
+    var buildingName=s?s.building:'';
+    var subj=subject.replace(/\{day\}/g,Math.abs(d)).replace(/\{school\}/g,schoolName).replace(/\{deadline\}/g,deadlineStr).replace(/\{building\}/g,buildingName);
+    var bd=body.replace(/\{day\}/g,Math.abs(d)).replace(/\{school\}/g,schoolName).replace(/\{deadline\}/g,deadlineStr).replace(/\{building\}/g,buildingName);
     // plain text → HTML 변환
     var htmlBody = '<div style="font-family:\'Malgun Gothic\',\'맑은 고딕\',sans-serif;font-size:11pt;color:#333;line-height:1.8;">' +
       bd.replace(/\n/g,'<br>')
