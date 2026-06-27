@@ -2417,6 +2417,7 @@ function switchModule(mod, el) {
   el.classList.add('active');
   document.querySelectorAll('.module-panel').forEach(function(p){ p.classList.remove('active'); });
   document.getElementById('module-' + mod).classList.add('active');
+  window.scrollTo(0,0);
   if (mod === 'dashboard') {
     setTimeout(function(){ window.dispatchEvent(new Event('resize')); }, 150);
   }
@@ -3035,6 +3036,7 @@ function enterModule(mod){
   document.getElementById('screen-module-select').style.display='none';
   document.getElementById('screen-app').style.display='flex';
   document.querySelectorAll('.module-panel').forEach(function(p){p.classList.remove('active');});
+  window.scrollTo(0,0);
   if(mod==='dashboard'){
     document.getElementById('nav-dashboard').click();
   } else if(mod==='research'){
