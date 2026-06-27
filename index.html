@@ -7783,9 +7783,7 @@ function _renderBubbles(agg, tier) {
       var sidoBounds = _getSidoBounds(k);
       clickData = sidoBounds ? { bounds: sidoBounds } : { zoom: 8 };
     } else if (tier === 'sgg') {
-      clickData = { zoom: 5 };
-    } else {
-      clickData = { zoom: 3 };
+      clickData = { zoom: 6 };
     }
 
     var bubble = _createBubble(name, a.schools.size, a.danger, a.lat, a.lng, clickData);
@@ -7835,7 +7833,6 @@ function _doUpdateViewport() {
   var tier;
   if (zoom >= 10) tier = 'sido';
   else if (zoom >= 7) tier = 'sgg';
-  else if (zoom >= 5) tier = 'gu';
   else tier = 'marker';
 
   // 버블 모드: 기존 마커 제거 후 버블 표시
@@ -7847,8 +7844,7 @@ function _doUpdateViewport() {
     _clearBubbles();
 
     if (tier === 'sido') _renderBubbles(_bubbleSidoAgg, 'sido');
-    else if (tier === 'sgg') _renderBubbles(_bubbleSggAgg, 'sgg');
-    else _renderBubbles(_bubbleGuAgg, 'gu');
+    else _renderBubbles(_bubbleSggAgg, 'sgg');
 
     _lastBubbleZoomTier = tier;
     // 통계 업데이트 (전체 기준)
