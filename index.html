@@ -7192,7 +7192,11 @@ var _mapGeoCache = {};
 function mapInitKakao() {
   if (_mapInited) return;
   try {
-    if (typeof kakao === 'undefined' || !kakao.maps) { console.warn('Kakao SDK 미로드'); return; }
+    if (typeof kakao === 'undefined' || !kakao.maps) {
+      // SDK 아직 로드 안 됨 — 1초 후 재시도
+      setTimeout(mapInitKakao, 1000);
+      return;
+    }
     kakao.maps.load(function() {
       var container = document.getElementById('mapContainer');
       _mapObj = new kakao.maps.Map(container, {
