@@ -4360,7 +4360,7 @@ function emailGetMissing(sid) {
   var cl = getCL();
   var schoolCL = cl[sid] || {};
   var missing = [];
-  var requiredItems = CL_ITEMS.filter(function(c){ return c.schoolReq; });
+  var requiredItems = CHECKLIST.filter(function(c){ return c.schoolReq; });
   requiredItems.forEach(function(c) {
     if (!schoolCL[c.key]) missing.push(c.label);
   });
