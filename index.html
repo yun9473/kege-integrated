@@ -2542,6 +2542,18 @@ function switchModule(mod, el) {
     document.querySelectorAll('#module-dashboard .tab-bar .tab').forEach(function(t){ t.classList.remove('active'); });
     var firstTab = document.querySelector('#module-dashboard .tab-bar .tab');
     if (firstTab) firstTab.classList.add('active');
+    // 지도 뷰 초기화
+    var mapMain = document.querySelector('#tab-map > .main');
+    if (mapMain) mapMain.style.height = 'calc(100vh - 110px)';
+    var mapView = document.getElementById('mapSubView-map');
+    var regionView = document.getElementById('mapSubView-region');
+    if (mapView) mapView.style.display = 'flex';
+    if (regionView) { regionView.style.display = 'none'; regionView.style.height = '0'; }
+  }
+  // module-dashboard 강제 비활성화 확인
+  if (mod !== 'dashboard') {
+    var dashPanel = document.getElementById('module-dashboard');
+    if (dashPanel) dashPanel.classList.remove('active');
   }
   if (mod === 'dashboard') {
     setTimeout(function(){ window.dispatchEvent(new Event('resize')); }, 150);
