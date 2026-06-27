@@ -7581,8 +7581,12 @@ function mapApplyFilter() {
   });
 
   if (_mapClusterer) {
+    console.time('clusterer-clear');
     _mapClusterer.clear();
+    console.timeEnd('clusterer-clear');
+    console.time('clusterer-addMarkers(' + visible.length + ')');
     _mapClusterer.addMarkers(visible);
+    console.timeEnd('clusterer-addMarkers(' + visible.length + ')');
   }
 }
 
