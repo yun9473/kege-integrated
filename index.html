@@ -4354,6 +4354,18 @@ function emailExportExcel(){
   XLSX.writeFile(wb,'알림이메일_'+(currentProject?.name||'목록')+'.xlsx');
 }
 
+// 학교별 미제출 필수 항목 조회 (실배치도, 사전인터뷰만)
+function emailGetMissing(sid) {
+  var cl = getCL();
+  var schoolCL = cl[sid] || {};
+  var missing = [];
+  var requiredItems = CL_ITEMS.filter(function(c){ return c.schoolReq; });
+  requiredItems.forEach(function(c) {
+    if (!schoolCL[c.key]) missing.push(c.label);
+  });
+  return missing;
+}
+
 function emailPreviewSend(){
   var data = emailGetData();
   var emails = data.emails||{};
@@ -4370,16 +4382,40 @@ function emailPreviewSend(){
 
   var d = calcDday(dday);
   var deadlineStr = dday;
-  var preview = selected.slice(0,5).map(function(item){
-    var s = SCHOOLS.find(function(x){return x.id===item.sid;});
-    var subj = subject.replace(/\{day\}/g,Math.abs(d)).replace(/\{school\}/g,s?s.school:'').replace(/\{deadline\}/g,deadlineStr);
-    return '<div style="padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:12px;"><strong>'+item.email+'</strong> — '+subj+'</div>';
-  }).join('');
-  if(selected.length>5) preview+='<div style="font-size:11px;color:#999;padding:4px 0;">외 '+(selected.length-5)+'건...</div>';
 
-  document.getElementById('m-title').textContent='이메일 발송 확인';
-  document.getElementById('m-body').innerHTML='<div style="margin-bottom:10px;font-size:13px;color:#333;">총 <strong>'+selected.length+'건</strong> 발송 예정</div>'+preview+
-    '<div style="margin-top:12px;padding:10px;background:#f5f5f7;border-radius:8px;font-size:11px;color:#555;">Power Automate HTTP 트리거를 통해 발송됩니다.</div>';
+  // 첫 번째 대상으로 미리보기 생성
+  var firstItem = selected[0];
+  var sid0 = parseInt(firstItem.sid);
+  var s0 = SCHOOLS.find(function(x){return x.id===sid0;});
+  var missing0 = emailGetMissing(sid0);
+  var missingText0 = missing0.length > 0 ? '\n\n※ 현재 미제출 항목: ' + missing0.join(', ') : '\n\n※ 모든 필수 항목이 제출되었습니다.';
+  var fullBody0 = body.replace(/\{day\}/g,Math.abs(d)).replace(/\{school\}/g,s0?s0.school:'').replace(/\{deadline\}/g,deadlineStr).replace(/\{building\}/g,s0?s0.building:'').replace(/\{missing\}/g, missing0.join(', ')||'없음') + missingText0;
+  var subj0 = subject.replace(/\{day\}/g,Math.abs(d)).replace(/\{school\}/g,s0?s0.school:'').replace(/\{deadline\}/g,deadlineStr);
+
+  // 대상 목록
+  var listHtml = selected.map(function(item){
+    var sid = parseInt(item.sid);
+    var s = SCHOOLS.find(function(x){return x.id===sid;});
+    var miss = emailGetMissing(sid);
+    var missLabel = miss.length > 0 ? '<span style="color:#dc2626;font-weight:600;">미제출: '+miss.join(', ')+'</span>' : '<span style="color:#059669;">제출 완료</span>';
+    return '<div style="padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;">'+
+      '<span><strong>'+item.email+'</strong> · '+(s?s.school+' '+s.building:'')+'</span>'+missLabel+'</div>';
+  }).join('');
+
+  document.getElementById('m-title').textContent='이메일 발송 미리보기';
+  document.getElementById('m-body').innerHTML=
+    '<div style="margin-bottom:12px;font-size:13px;color:#333;">총 <strong>'+selected.length+'건</strong> 발송 예정</div>'+
+    '<div style="margin-bottom:12px;padding:12px;background:#f5f5f7;border-radius:10px;">'+
+      '<div style="font-size:11px;font-weight:700;color:#555;margin-bottom:6px;">제목 미리보기</div>'+
+      '<div style="font-size:13px;font-weight:600;color:#1d1d1f;">'+subj0+'</div>'+
+    '</div>'+
+    '<div style="margin-bottom:12px;padding:12px;background:#f5f5f7;border-radius:10px;max-height:200px;overflow-y:auto;">'+
+      '<div style="font-size:11px;font-weight:700;color:#555;margin-bottom:6px;">본문 미리보기 ('+( s0?s0.school:'첫 번째 대상')+')</div>'+
+      '<div style="font-size:12px;color:#333;line-height:1.7;white-space:pre-wrap;">'+fullBody0+'</div>'+
+    '</div>'+
+    '<div style="margin-bottom:8px;font-size:11px;font-weight:700;color:#555;">대상 목록 및 미제출 현황</div>'+
+    '<div style="max-height:200px;overflow-y:auto;">'+listHtml+'</div>'+
+    '<div style="margin-top:12px;padding:8px;background:#fffbeb;border-radius:8px;font-size:11px;color:#92400E;">⚠ 미제출 항목이 있는 학교에만 발송하는 것을 권장합니다.</div>';
   document.getElementById('m-ok').textContent='발송';
   document.getElementById('m-ok').onclick=function(){ closeModal(); emailDoSend(selected,subject,body,dday); };
   document.getElementById('mbg').classList.add('open');
@@ -4418,8 +4454,10 @@ async function emailDoSend(targets,subject,body,dday){
     var s=SCHOOLS.find(function(x){return x.id===sid;});
     var schoolName=s?s.school:'';
     var buildingName=s?s.building:'';
+    var missing=emailGetMissing(sid);
+    var missingText=missing.length>0?'\n\n※ 현재 미제출 항목: '+missing.join(', ')+'\n위 항목을 마감일까지 제출해 주시기 바랍니다.':'';
     var subj=subject.replace(/\{day\}/g,Math.abs(d)).replace(/\{school\}/g,schoolName).replace(/\{deadline\}/g,deadlineStr).replace(/\{building\}/g,buildingName);
-    var bd=body.replace(/\{day\}/g,Math.abs(d)).replace(/\{school\}/g,schoolName).replace(/\{deadline\}/g,deadlineStr).replace(/\{building\}/g,buildingName);
+    var bd=body.replace(/\{day\}/g,Math.abs(d)).replace(/\{school\}/g,schoolName).replace(/\{deadline\}/g,deadlineStr).replace(/\{building\}/g,buildingName)+missingText;
     // plain text → HTML 변환
     var htmlBody = '<div style="font-family:\'Malgun Gothic\',\'맑은 고딕\',sans-serif;font-size:11pt;color:#333;line-height:1.8;">' +
       bd.replace(/\n/g,'<br>')
