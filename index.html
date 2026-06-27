@@ -7850,16 +7850,17 @@ function mapUpdateStatsForViewport() { mapUpdateViewport(); }
 function mapSwitchSub(view) {
   var mapView = document.getElementById('mapSubView-map');
   var regionView = document.getElementById('mapSubView-region');
+  var mainWrap = document.querySelector('#tab-map > .main');
   if (view === 'map') {
     mapView.style.display = 'flex';
     regionView.style.display = 'none';
-    regionView.style.height = '0';
-    if (_mapObj) _mapObj.relayout();
+    if (mainWrap) mainWrap.style.height = 'calc(100vh - 110px)';
+    if (_mapObj) setTimeout(function(){ _mapObj.relayout(); }, 100);
   } else {
     mapView.style.display = 'none';
     regionView.style.display = 'block';
-    regionView.style.height = 'auto';
-    regionView.style.flex = '1';
+    if (mainWrap) mainWrap.style.height = 'auto';
+    regionView.style.minHeight = 'calc(100vh - 160px)';
     if (_mapData.length) mapRegionView('sido');
   }
   document.getElementById('mapSubTab-map').classList.toggle('active', view === 'map');
