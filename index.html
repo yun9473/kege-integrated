@@ -2521,8 +2521,10 @@ var _dashboardChartsReady = false;
 function switchModule(mod, el) {
   document.querySelectorAll('.integrated-nav .nav-item').forEach(function(b){ b.classList.remove('active'); });
   el.classList.add('active');
-  document.querySelectorAll('.module-panel').forEach(function(p){ p.classList.remove('active'); });
-  document.getElementById('module-' + mod).classList.add('active');
+  document.querySelectorAll('.module-panel').forEach(function(p){ p.classList.remove('active'); p.style.display='none'; });
+  var activePanel = document.getElementById('module-' + mod);
+  activePanel.classList.add('active');
+  activePanel.style.display='block';
   window.scrollTo(0,0);
   document.querySelectorAll('.body-wrap').forEach(function(bw){bw.scrollTop=0;});
   document.querySelectorAll('.main').forEach(function(m){m.scrollTop=0;});
