@@ -7406,8 +7406,7 @@ function mapRenderMarkers() {
   function afterPreCache() {
     var needGeocode = [];
 
-    mapShowLoading('1단계: 좌표 매칭', '캐시 확인 중...', 5);
-
+    console.time('geo-cache-match');
     // 1단계: 좌표 매칭 (마커는 아직 안 만듦)
     var cachedItems = [];
     _mapData.forEach(function(d) {
@@ -7424,18 +7423,27 @@ function mapRenderMarkers() {
         needGeocode.push(d);
       }
     });
+    console.timeEnd('geo-cache-match');
+    console.log('cached:', cachedItems.length, 'needGeocode:', needGeocode.length);
+
+    mapShowLoading('1단계: 좌표 매칭', cachedItems.length + '건 매칭 완료', 5);
 
     // 마커 배치 생성 (requestAnimationFrame, 200개씩)
     var mkIdx = 0;
     var MK_BATCH = 200;
+    console.time('build-all-markers');
     function buildMarkerBatch() {
       if (mkIdx >= cachedItems.length) {
+        console.timeEnd('build-all-markers');
+        console.log('markers:', _mapMarkers.length);
         doneCount = cachedItems.length;
         var pct1 = Math.round(doneCount / total * 100);
         mapShowLoading('1단계 완료', doneCount + '건 마커 생성 완료', pct1);
         document.getElementById('mapDataCount').textContent = doneCount + ' / ' + total;
         // 클러스터러에 한 번만 등록
+        console.time('first-filter');
         mapApplyFilter();
+        console.timeEnd('first-filter');
         if (needGeocode.length === 0) {
           mapShowLoading('완료!', total + '개 건물 표시', 100);
           setTimeout(mapHideLoading, 1500);
@@ -7445,9 +7453,11 @@ function mapRenderMarkers() {
         return;
       }
       var end = Math.min(mkIdx + MK_BATCH, cachedItems.length);
+      console.time('batch-' + mkIdx);
       for (var i = mkIdx; i < end; i++) {
         _mapMarkers.push(mapCreateMarker(cachedItems[i]));
       }
+      console.timeEnd('batch-' + mkIdx);
       mkIdx = end;
       var pct = Math.round(mkIdx / total * 100);
       mapShowLoading('마커 생성 중 (' + mkIdx + '/' + cachedItems.length + ')', Math.round(mkIdx/cachedItems.length*100) + '% 완료', pct);
