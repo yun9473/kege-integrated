@@ -7660,7 +7660,7 @@ function _clearBubbles() {
   _currentBubbles = [];
 }
 
-function _createBubble(name, total, danger, lat, lng, clickZoom) {
+function _createBubble(name, total, danger, lat, lng, clickData) {
   var pct = total > 0 ? danger / total : 0;
   var color = pct >= 0.1 ? '#dc2626' : pct >= 0.07 ? '#d97706' : pct >= 0.03 ? '#0066cc' : '#059669';
   var size = Math.max(40, Math.min(80, 30 + Math.sqrt(total) * 3));
@@ -7675,8 +7675,12 @@ function _createBubble(name, total, danger, lat, lng, clickZoom) {
   el.onmouseenter = function(){ el.style.transform='scale(1.12)'; };
   el.onmouseleave = function(){ el.style.transform='none'; };
   el.onclick = function(){
-    _mapObj.setCenter(new kakao.maps.LatLng(lat, lng));
-    _mapObj.setLevel(clickZoom);
+    if (clickData && clickData.bounds) {
+      _mapObj.setBounds(clickData.bounds, 60);
+    } else if (clickData && clickData.zoom) {
+      _mapObj.setCenter(new kakao.maps.LatLng(lat, lng));
+      _mapObj.setLevel(clickData.zoom);
+    }
   };
 
   var overlay = new kakao.maps.CustomOverlay({
@@ -7684,30 +7688,108 @@ function _createBubble(name, total, danger, lat, lng, clickZoom) {
     content: el,
     yAnchor: 0.5, xAnchor: 0.5
   });
+  overlay._bubbleSize = size;
+  overlay._lat = lat;
+  overlay._lng = lng;
   return overlay;
 }
 
-function _renderBubbles(agg, clickZoom) {
+// 버블 겹침 방지: 픽셀 거리 기반 반복 밀어내기
+function _spreadBubbles(bubbles) {
+  if (bubbles.length < 2) return;
+  var proj = _mapObj.getProjection();
+  var positions = bubbles.map(function(b) {
+    var px = proj.pointFromCoords(b.getPosition());
+    return { x: px.x, y: px.y, size: b._bubbleSize || 50 };
+  });
+
+  for (var iter = 0; iter < 8; iter++) {
+    var moved = false;
+    for (var i = 0; i < positions.length; i++) {
+      for (var j = i + 1; j < positions.length; j++) {
+        var dx = positions[j].x - positions[i].x;
+        var dy = positions[j].y - positions[i].y;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        var minDist = (positions[i].size + positions[j].size) / 2 + 8;
+        if (dist < minDist && dist > 0) {
+          var push = (minDist - dist) / 2 + 1;
+          var nx = dx / dist, ny = dy / dist;
+          positions[i].x -= nx * push;
+          positions[i].y -= ny * push;
+          positions[j].x += nx * push;
+          positions[j].y += ny * push;
+          moved = true;
+        } else if (dist === 0) {
+          positions[j].x += 20;
+          positions[j].y += 15;
+          moved = true;
+        }
+      }
+    }
+    if (!moved) break;
+  }
+
+  for (var k = 0; k < bubbles.length; k++) {
+    var newPos = proj.coordsFromPoint(new kakao.maps.Point(positions[k].x, positions[k].y));
+    bubbles[k].setPosition(newPos);
+  }
+}
+
+// 시도 클릭 시 해당 시도의 모든 시군구를 포함하는 bounds 계산
+function _getSidoBounds(sidoName) {
+  var bounds = new kakao.maps.LatLngBounds();
+  var found = false;
+  for (var k in _bubbleSggAgg) {
+    var a = _bubbleSggAgg[k];
+    if (a.sido === sidoName) {
+      bounds.extend(new kakao.maps.LatLng(a.lat, a.lng));
+      found = true;
+    }
+  }
+  if (!found) return null;
+  return bounds;
+}
+
+function _renderBubbles(agg, tier) {
   var bounds = _mapObj.getBounds();
   var sw = bounds.getSouthWest(), ne = bounds.getNorthEast();
   var sLat = sw.getLat(), sLng = sw.getLng(), nLat = ne.getLat(), nLng = ne.getLng();
-  // 필터 수집
   var filters = _collectFilters();
+  var bubbles = [];
 
   for (var k in agg) {
     var a = agg[k];
-    // 시도 필터
     var sido = a.sido || k;
     if (!filters.allSido && !filters.sidoFilter[sido]) continue;
-    // 뷰포트 (시도 버블은 항상 표시)
-    if (clickZoom < 11) {
+
+    // 시도 버블은 항상 표시, 나머지는 뷰포트 필터
+    if (tier !== 'sido') {
       if (a.lat < sLat || a.lat > nLat || a.lng < sLng || a.lng > nLng) continue;
     }
+
     var name = a.name || k;
-    if (name.length > 5) name = name.substring(0, 5);
-    var bubble = _createBubble(name, a.schools.size, a.danger, a.lat, a.lng, clickZoom);
+    if (name.length > 6) name = name.substring(0, 5) + '…';
+
+    // 클릭 동작 결정
+    var clickData;
+    if (tier === 'sido') {
+      var sidoBounds = _getSidoBounds(k);
+      clickData = sidoBounds ? { bounds: sidoBounds } : { zoom: 8 };
+    } else if (tier === 'sgg') {
+      clickData = { zoom: 5 };
+    } else {
+      clickData = { zoom: 3 };
+    }
+
+    var bubble = _createBubble(name, a.schools.size, a.danger, a.lat, a.lng, clickData);
     bubble.setMap(_mapObj);
     _currentBubbles.push(bubble);
+    bubbles.push(bubble);
+  }
+
+  // 버블 겹침 방지
+  if (bubbles.length > 1) {
+    try { _spreadBubbles(bubbles); } catch(e) {}
   }
 }
 
@@ -7757,9 +7839,9 @@ function _doUpdateViewport() {
     _currentVisibleIds = new Set();
     _clearBubbles();
 
-    if (tier === 'sido') _renderBubbles(_bubbleSidoAgg, 8);
-    else if (tier === 'sgg') _renderBubbles(_bubbleSggAgg, 5);
-    else _renderBubbles(_bubbleGuAgg, 3);
+    if (tier === 'sido') _renderBubbles(_bubbleSidoAgg, 'sido');
+    else if (tier === 'sgg') _renderBubbles(_bubbleSggAgg, 'sgg');
+    else _renderBubbles(_bubbleGuAgg, 'gu');
 
     _lastBubbleZoomTier = tier;
     // 통계 업데이트 (전체 기준)
