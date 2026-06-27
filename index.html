@@ -7388,55 +7388,68 @@ function mapRenderMarkers() {
   if (cached) try { _mapGeoCache = JSON.parse(cached); } catch(e) {}
 
   var total = _mapData.length;
-  var processed = 0;
+  var doneCount = 0;
   var needGeocode = [];
 
-  mapShowLoading('좌표 변환 준비', '캐시 확인 중...', 5);
+  mapShowLoading('1단계: 캐시 확인', '기존 좌표 데이터 확인 중... (0/' + total + ')', 0);
 
-  // 1단계: 캐시된 좌표로 즉시 마커 생성
+  // 1단계: 캐시/주소없음 → 즉시 마커
   _mapData.forEach(function(d) {
     if (!d.address) {
-      // 주소 없으면 시도 중심 + 랜덤 오프셋
       var sc = _sidoCenter[d.sido] || _sidoCenter['미분류'];
       d.lat = sc[0] + (Math.random() - 0.5) * 0.3;
       d.lng = sc[1] + (Math.random() - 0.5) * 0.3;
       _mapMarkers.push(mapCreateMarker(d));
-      processed++;
+      doneCount++;
     } else if (_mapGeoCache[d.address]) {
       var c = _mapGeoCache[d.address];
       d.lat = c[0]; d.lng = c[1];
       _mapMarkers.push(mapCreateMarker(d));
-      processed++;
+      doneCount++;
     } else {
       needGeocode.push(d);
     }
   });
 
-  var cachePct = total > 0 ? Math.round(processed / total * 50) + 10 : 10;
-  mapShowLoading('캐시 적용 완료', processed + '건 즉시 로드, ' + needGeocode.length + '건 좌표변환 필요', cachePct);
-  document.getElementById('mapDataCount').textContent = processed + '/' + total;
+  var pct1 = Math.round(doneCount / total * 100);
+  mapShowLoading('1단계 완료: 캐시 적용', doneCount + '건 즉시 완료 / ' + needGeocode.length + '건 좌표변환 필요', pct1);
+  document.getElementById('mapDataCount').textContent = doneCount + ' / ' + total;
 
-  // 2단계: Geocoder 배치 처리 (초당 10건)
+  if (needGeocode.length === 0) {
+    mapApplyFilter();
+    mapShowLoading('완료!', total + '개 건물 표시', 100);
+    setTimeout(mapHideLoading, 1500);
+    return;
+  }
+
+  // 2단계: Geocoder 배치 (초당 10건, 매 배치마다 진행률 갱신)
   var batchIdx = 0;
   var BATCH_SIZE = 10;
   var BATCH_DELAY = 1100;
+  var geoTotal = needGeocode.length;
 
   function processBatch() {
-    if (batchIdx >= needGeocode.length) {
-      // 전부 완료
+    if (batchIdx >= geoTotal) {
       localStorage.setItem('mapGeoCache', JSON.stringify(_mapGeoCache));
       mapApplyFilter();
-      document.getElementById('mapDataCount').textContent = _mapData.length + '개 건물';
-      mapShowLoading('완료!', _mapData.length + '개 건물 표시', 100);
+      document.getElementById('mapDataCount').textContent = total + '개 건물';
+      mapShowLoading('완료!', total + '개 건물 표시 완료', 100);
       setTimeout(mapHideLoading, 1500);
       return;
     }
-    var end = Math.min(batchIdx + BATCH_SIZE, needGeocode.length);
-    var remaining = needGeocode.length - batchIdx;
-    var pct = 60 + Math.round(batchIdx / needGeocode.length * 40);
-    var minLeft = Math.ceil(remaining / BATCH_SIZE * BATCH_DELAY / 1000 / 60);
-    mapShowLoading('좌표 변환 중', batchIdx + '/' + needGeocode.length + ' 완료 (약 ' + minLeft + '분 남음)', pct);
-    document.getElementById('mapDataCount').textContent = (processed + batchIdx) + '/' + total;
+
+    var end = Math.min(batchIdx + BATCH_SIZE, geoTotal);
+    var allDone = doneCount + batchIdx;
+    var pct = Math.round(allDone / total * 100);
+    var remaining = geoTotal - batchIdx;
+    var secLeft = Math.ceil(remaining / BATCH_SIZE * BATCH_DELAY / 1000);
+    var timeStr = secLeft >= 60 ? Math.ceil(secLeft / 60) + '분' : secLeft + '초';
+    mapShowLoading(
+      '2단계: 좌표 변환 중 (' + allDone + '/' + total + ')',
+      '처리: ' + batchIdx + '/' + geoTotal + ' | 남은 시간: ~' + timeStr,
+      pct
+    );
+    document.getElementById('mapDataCount').textContent = allDone + ' / ' + total;
 
     for (var i = batchIdx; i < end; i++) {
       (function(d) {
@@ -7455,8 +7468,8 @@ function mapRenderMarkers() {
     }
     batchIdx = end;
 
-    // 중간 캐시 저장 (500건마다)
-    if (batchIdx % 500 < BATCH_SIZE) {
+    // 100건마다 캐시 저장 + 지도 반영
+    if (batchIdx % 100 < BATCH_SIZE) {
       localStorage.setItem('mapGeoCache', JSON.stringify(_mapGeoCache));
       mapApplyFilter();
     }
@@ -7464,14 +7477,7 @@ function mapRenderMarkers() {
     setTimeout(processBatch, BATCH_DELAY);
   }
 
-  if (needGeocode.length > 0) {
-    processBatch();
-  } else {
-    mapApplyFilter();
-    document.getElementById('mapDataCount').textContent = _mapData.length + '개 건물';
-    mapShowLoading('완료!', _mapData.length + '개 건물 표시', 100);
-    setTimeout(mapHideLoading, 1500);
-  }
+  processBatch();
 }
 
 function mapApplyFilter() {
