@@ -8544,13 +8544,14 @@ function mapSwitchSub(view) {
   var mapView = document.getElementById('mapSubView-map');
   var regionView = document.getElementById('mapSubView-region');
   var mainWrap = document.querySelector('#tab-map > .main');
-  if (mainWrap) mainWrap.style.height = 'calc(100vh - 110px)';
   if (view === 'map') {
+    if (mainWrap) mainWrap.style.height = 'calc(100vh - 110px)';
     mapView.style.display = 'flex';
     regionView.style.display = 'none';
     regionView.style.height = '0';
     if (_mapObj) setTimeout(function(){ _mapObj.relayout(); }, 100);
   } else {
+    if (mainWrap) mainWrap.style.height = 'auto';
     mapView.style.display = 'none';
     regionView.style.display = 'block';
     regionView.style.height = 'auto';
@@ -8559,6 +8560,7 @@ function mapSwitchSub(view) {
   }
   document.getElementById('mapSubTab-map').classList.toggle('active', view === 'map');
   document.getElementById('mapSubTab-region').classList.toggle('active', view === 'region');
+  window.scrollTo(0,0);
 }
 
 // ── 학교 위치로 이동 + InfoWindow 열기 ──
