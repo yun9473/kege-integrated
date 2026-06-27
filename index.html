@@ -8198,6 +8198,98 @@ function mapHideLoading() {
 }
 // ════════════ end MAP ════════════
 
+// ════════════ HISTORY (뒤로가기) ════════════
+var _navHistory = [];
+var _navHandlingPop = false;
+
+function navPush(state) {
+  if (_navHandlingPop) return;
+  _navHistory.push(state);
+  try { history.pushState(state, '', ''); } catch(e) {}
+}
+
+// 각 네비게이션 함수에 히스토리 연동
+var _origSwitchModule = switchModule;
+switchModule = function(mod, el) {
+  _origSwitchModule(mod, el);
+  navPush({ type: 'module', mod: mod });
+};
+
+var _origSwitchTab = switchTab;
+switchTab = function(id, el) {
+  _origSwitchTab(id, el);
+  navPush({ type: 'tab', id: id });
+};
+
+var _origShowScreen = showScreen;
+showScreen = function(n) {
+  _origShowScreen(n);
+  navPush({ type: 'screen', screen: n });
+};
+
+var _origMapSwitchSub = mapSwitchSub;
+mapSwitchSub = function(view) {
+  _origMapSwitchSub(view);
+  navPush({ type: 'mapSub', view: view });
+};
+
+var _origMapRegionDrillDown = mapRegionDrillDown;
+mapRegionDrillDown = function(sido) {
+  _origMapRegionDrillDown(sido);
+  navPush({ type: 'mapRegion', sido: sido });
+};
+
+var _origMapShowSggSchools = mapShowSggSchools;
+mapShowSggSchools = function(sido, sgg) {
+  _origMapShowSggSchools(sido, sgg);
+  navPush({ type: 'mapSgg', sido: sido, sgg: sgg });
+};
+
+var _origMapShowSchoolDetail = mapShowSchoolDetail;
+mapShowSchoolDetail = function(id) {
+  _origMapShowSchoolDetail(id);
+  navPush({ type: 'mapSchool', id: id });
+};
+
+// popstate 핸들러 — 뒤로가기 시 이전 상태 복원
+window.addEventListener('popstate', function(e) {
+  _navHandlingPop = true;
+  _navHistory.pop(); // 현재 상태 제거
+  var prev = _navHistory[_navHistory.length - 1];
+
+  if (!prev) {
+    // 최초 상태 — 첫 화면으로
+    _navHandlingPop = false;
+    return;
+  }
+
+  if (prev.type === 'module') {
+    var btn = document.querySelector('.nav-item#nav-' + prev.mod) || document.querySelector('.nav-item');
+    if (btn) _origSwitchModule(prev.mod, btn);
+  } else if (prev.type === 'tab') {
+    _origSwitchTab(prev.id, null);
+  } else if (prev.type === 'screen') {
+    _origShowScreen(prev.screen);
+  } else if (prev.type === 'mapSub') {
+    _origMapSwitchSub(prev.view);
+  } else if (prev.type === 'mapRegion') {
+    _origMapSwitchSub('region');
+    if (_mapData.length) renderSigunguView(document.getElementById('mapSubView-region'), prev.sido);
+  } else if (prev.type === 'mapSgg') {
+    _origMapSwitchSub('region');
+    if (_mapData.length) mapShowSggSchools(prev.sido, prev.sgg);
+  } else if (prev.type === 'mapSchool') {
+    // 학교 상세에서 뒤로 → 시군구 목록으로
+    _origMapSwitchSub('region');
+  }
+
+  _navHandlingPop = false;
+});
+
+// 초기 상태 등록
+navPush({ type: 'module', mod: 'upload' });
+// ════════════ end HISTORY ════════════
+
 
 </script>
 </body>
