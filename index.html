@@ -3367,6 +3367,7 @@ function selectSchool(id){
   document.getElementById('sel-label').textContent='— '+sLabel(s);
   buildChecklist(id); schoolFiles=[]; renderSchoolFiles();
   document.getElementById('btn-school-up').disabled=true;
+  setTimeout(function(){ document.getElementById('sel-panel').scrollIntoView({behavior:'smooth',block:'start'}); },100);
 }
 
 // ════════════════════════════════════
