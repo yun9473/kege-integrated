@@ -2110,6 +2110,33 @@ table.dtable tbody tr{cursor:pointer;}
       </div>
     </div>
   </div>
+
+  <!-- 지역별 비교 대시보드 -->
+  <div id="mapRegionDashboard" style="display:none;border-top:1px solid #e0e0e0;background:#fafafa;overflow-y:auto;max-height:420px;">
+    <div style="padding:16px 24px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <div style="font-size:15px;font-weight:700;color:#1d1d1f;">📊 지역별 비교 분석</div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-sm" style="background:#1d1d1f;color:#fff;border-radius:9999px;padding:5px 14px;font-size:11px;border:none;cursor:pointer;" onclick="mapRegionView('sido')">시도별</button>
+          <button class="btn btn-sm" style="background:#fff;color:#333;border:1px solid #e0e0e0;border-radius:9999px;padding:5px 14px;font-size:11px;cursor:pointer;" onclick="mapRegionView('sigungu')">시군구별</button>
+        </div>
+      </div>
+      <!-- 시도별 요약 카드 -->
+      <div id="mapRegionCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-bottom:16px;"></div>
+      <!-- 시도별 막대 차트 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        <div class="card" style="padding:16px;">
+          <div class="card-title" style="font-size:13px;">위험 건물 비율 (시도별)</div>
+          <div id="mapRegionBarChart" style="max-height:300px;"></div>
+        </div>
+        <div class="card" style="padding:16px;">
+          <div class="card-title" style="font-size:13px;">경과연수 분포 (시도별)</div>
+          <div id="mapRegionAgeChart" style="max-height:300px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
 </div>
 
@@ -7348,6 +7375,7 @@ function mapLoadExcel(input) {
     document.getElementById('mapEmptyMsg').style.display = 'none';
     mapBuildSidoFilters();
     mapUpdateStats();
+    mapBuildRegionDashboard();
     // 지도 초기화 완료 후 렌더링
     console.log('mapLoadExcel: calling mapInitKakao().then(mapRenderMarkers)');
     mapInitKakao().then(function() {
@@ -7742,6 +7770,118 @@ function mapUpdateStats() {
     '<div style="color:#059669">🟢 양호: <strong>' + stats.good + '동</strong></div>' +
     '<div style="color:#7a7a7a">⚪ 미분류: <strong>' + stats.unknown + '동</strong></div>';
   document.getElementById('mapStatsOverlay').style.display = 'block';
+}
+
+function mapBuildRegionDashboard() {
+  if (!_mapData.length) return;
+  document.getElementById('mapRegionDashboard').style.display = 'block';
+  mapRegionView('sido');
+}
+
+function mapRegionView(mode) {
+  // 버튼 활성화
+  var btns = document.querySelectorAll('#mapRegionDashboard .btn');
+  btns.forEach(function(b) {
+    if ((mode === 'sido' && b.textContent === '시도별') || (mode === 'sigungu' && b.textContent === '시군구별')) {
+      b.style.background = '#1d1d1f'; b.style.color = '#fff'; b.style.border = 'none';
+    } else {
+      b.style.background = '#fff'; b.style.color = '#333'; b.style.border = '1px solid #e0e0e0';
+    }
+  });
+
+  var regions = {};
+  _mapData.forEach(function(d) {
+    var key = mode === 'sido' ? d.sido : (d.sido + ' ' + mapParseSigungu(d.address));
+    if (!key.trim() || key.includes('undefined')) key = d.sido + ' 기타';
+    if (!regions[key]) regions[key] = { total: 0, danger: 0, warning: 0, caution: 0, good: 0, unknown: 0, schools: new Set(), ages: [] };
+    var r = regions[key];
+    r.total++;
+    r[d.gradeInfo.key] = (r[d.gradeInfo.key] || 0) + 1;
+    r.schools.add(d.school);
+    if (d.year) r.ages.push(new Date().getFullYear() - parseInt(d.year));
+  });
+
+  // 카드
+  var cardsEl = document.getElementById('mapRegionCards');
+  var sorted = Object.keys(regions).sort(function(a, b) { return (regions[b].danger + regions[b].warning) - (regions[a].danger + regions[a].warning); });
+  var html = '';
+  sorted.forEach(function(key) {
+    var r = regions[key];
+    var dangerPct = r.total > 0 ? Math.round((r.danger + r.warning) / r.total * 100) : 0;
+    var avgAge = r.ages.length > 0 ? Math.round(r.ages.reduce(function(a, b) { return a + b; }, 0) / r.ages.length) : 0;
+    var barColor = dangerPct >= 50 ? '#dc2626' : dangerPct >= 30 ? '#d97706' : dangerPct >= 10 ? '#0066cc' : '#059669';
+    html += '<div style="background:#fff;border:1px solid #e0e0e0;border-radius:12px;padding:14px 16px;">' +
+      '<div style="font-size:13px;font-weight:700;margin-bottom:6px;">' + key + '</div>' +
+      '<div style="display:flex;justify-content:space-between;font-size:11px;color:#555;margin-bottom:8px;">' +
+        '<span>' + r.schools.size + '교 / ' + r.total + '동</span>' +
+        '<span>평균 ' + avgAge + '년</span>' +
+      '</div>' +
+      '<div style="background:#eee;border-radius:4px;height:8px;margin-bottom:6px;">' +
+        '<div style="width:' + dangerPct + '%;height:100%;background:' + barColor + ';border-radius:4px;"></div>' +
+      '</div>' +
+      '<div style="display:flex;justify-content:space-between;font-size:10px;">' +
+        '<span style="color:#dc2626;">위험 ' + r.danger + '</span>' +
+        '<span style="color:#d97706;">경계 ' + r.warning + '</span>' +
+        '<span style="color:#0066cc;">주의 ' + r.caution + '</span>' +
+        '<span style="color:#059669;">양호 ' + r.good + '</span>' +
+      '</div>' +
+    '</div>';
+  });
+  cardsEl.innerHTML = html;
+
+  // 막대 차트 (CSS 기반, Chart.js 안 쓰고 가벼운 HTML)
+  var barEl = document.getElementById('mapRegionBarChart');
+  var maxDanger = 0;
+  sorted.forEach(function(k) { var v = regions[k].danger + regions[k].warning; if (v > maxDanger) maxDanger = v; });
+  var barHtml = '';
+  sorted.slice(0, 20).forEach(function(key) {
+    var r = regions[key];
+    var dangerCnt = r.danger + r.warning;
+    var w = maxDanger > 0 ? Math.round(dangerCnt / maxDanger * 100) : 0;
+    barHtml += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">' +
+      '<div style="width:80px;font-size:10px;text-align:right;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + key + '">' + key + '</div>' +
+      '<div style="flex:1;background:#eee;border-radius:3px;height:14px;">' +
+        '<div style="width:' + w + '%;height:100%;background:linear-gradient(90deg,#d97706,#dc2626);border-radius:3px;display:flex;align-items:center;justify-content:flex-end;padding-right:4px;">' +
+          (w > 15 ? '<span style="font-size:9px;color:#fff;font-weight:700;">' + dangerCnt + '</span>' : '') +
+        '</div>' +
+      '</div>' +
+      (w <= 15 ? '<span style="font-size:9px;color:#666;">' + dangerCnt + '</span>' : '') +
+    '</div>';
+  });
+  barEl.innerHTML = barHtml;
+
+  // 경과연수 분포 차트
+  var ageEl = document.getElementById('mapRegionAgeChart');
+  var ageHtml = '';
+  var maxTotal = 0;
+  sorted.forEach(function(k) { if (regions[k].total > maxTotal) maxTotal = regions[k].total; });
+  sorted.slice(0, 20).forEach(function(key) {
+    var r = regions[key];
+    var a50 = 0, a45 = 0, a40 = 0, aLt = 0;
+    r.ages.forEach(function(a) { if (a >= 50) a50++; else if (a >= 45) a45++; else if (a >= 40) a40++; else aLt++; });
+    var tw = maxTotal > 0 ? Math.round(r.total / maxTotal * 100) : 0;
+    var p50 = r.total > 0 ? Math.round(a50 / r.total * tw) : 0;
+    var p45 = r.total > 0 ? Math.round(a45 / r.total * tw) : 0;
+    var p40 = r.total > 0 ? Math.round(a40 / r.total * tw) : 0;
+    var pLt = tw - p50 - p45 - p40;
+    ageHtml += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">' +
+      '<div style="width:80px;font-size:10px;text-align:right;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + key + '">' + key + '</div>' +
+      '<div style="flex:1;display:flex;height:14px;border-radius:3px;overflow:hidden;background:#eee;">' +
+        (p50 > 0 ? '<div style="width:' + p50 + '%;background:#dc2626;" title="50년+: ' + a50 + '"></div>' : '') +
+        (p45 > 0 ? '<div style="width:' + p45 + '%;background:#d97706;" title="45~49년: ' + a45 + '"></div>' : '') +
+        (p40 > 0 ? '<div style="width:' + p40 + '%;background:#0066cc;" title="40~44년: ' + a40 + '"></div>' : '') +
+        (pLt > 0 ? '<div style="width:' + pLt + '%;background:#059669;" title="40년 미만: ' + aLt + '"></div>' : '') +
+      '</div>' +
+      '<span style="font-size:9px;color:#666;">' + r.total + '</span>' +
+    '</div>';
+  });
+  ageHtml += '<div style="display:flex;gap:12px;margin-top:8px;font-size:10px;color:#555;">' +
+    '<span><span style="display:inline-block;width:8px;height:8px;background:#dc2626;border-radius:2px;"></span> 50년+</span>' +
+    '<span><span style="display:inline-block;width:8px;height:8px;background:#d97706;border-radius:2px;"></span> 45~49</span>' +
+    '<span><span style="display:inline-block;width:8px;height:8px;background:#0066cc;border-radius:2px;"></span> 40~44</span>' +
+    '<span><span style="display:inline-block;width:8px;height:8px;background:#059669;border-radius:2px;"></span> &lt;40</span>' +
+  '</div>';
+  ageEl.innerHTML = ageHtml;
 }
 
 function mapClearData() {
