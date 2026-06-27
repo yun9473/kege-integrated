@@ -1065,7 +1065,7 @@ table.dtable tbody tr{cursor:pointer;}
           <!-- 이메일 내용 템플릿 -->
           <div style="margin-bottom:16px;">
             <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;">이메일 제목</div>
-            <input class="fi" id="email-subject" value="[교육환경센터] 기초자료 제출 안내 (D-{day})" placeholder="제목 입력 ({day}=남은일수, {school}=학교명, {deadline}=마감일)"/>
+            <input class="fi" id="email-subject" value="(사)한국교육녹색환경연구원 공간재구조화사업 관련 기초자료 제출 요청 건" placeholder="제목 입력 ({day}=남은일수, {school}=학교명, {deadline}=마감일)"/>
             <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;margin-top:12px;">이메일 본문</div>
             <textarea class="fi" id="email-body" rows="8" style="resize:vertical;font-size:13px;line-height:1.7;">안녕하세요, 한국교육녹색환경연구원 교육환경센터입니다.
 
@@ -1105,7 +1105,8 @@ table.dtable tbody tr{cursor:pointer;}
 
           <!-- 발송 버튼 -->
           <div style="margin-top:16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <button class="btn btn-p" onclick="emailPreviewSend()">발송 미리보기</button>
+            <button class="btn btn-o" onclick="emailPreviewSend()">발송 미리보기</button>
+            <button class="btn btn-p" onclick="emailDirectSend()">발송하기</button>
             <span id="email-send-status" style="font-size:12px;color:var(--gray);"></span>
           </div>
 
@@ -4355,8 +4356,25 @@ function emailPreviewSend(){
   document.getElementById('mbg').classList.add('open');
 }
 
+function emailDirectSend(){
+  var data = emailGetData();
+  var emails = data.emails||{};
+  var dday = document.getElementById('email-dday').value;
+  if(!dday){ toast('마감일을 설정해주세요','error'); return; }
+  var subject = document.getElementById('email-subject').value;
+  var body = document.getElementById('email-body').value;
+  var selected = [];
+  document.querySelectorAll('.email-check:checked').forEach(function(cb){
+    var sid = cb.dataset.sid;
+    if(emails[sid]) selected.push({sid:sid, email:emails[sid]});
+  });
+  if(selected.length===0){ toast('발송 대상이 없습니다 (이메일 입력 및 선택 확인)','error'); return; }
+  if(!confirm('총 '+selected.length+'건 이메일을 발송합니다.\n계속하시겠습니까?')) return;
+  emailDoSend(selected,subject,body,dday);
+}
+
 async function emailDoSend(targets,subject,body,dday){
-  var paUrl = getCfg().paUrl;
+  var paUrl = cfg().paUrl;
   if(!paUrl){ toast('Power Automate URL이 설정되지 않았습니다','error'); return; }
   var d = calcDday(dday);
   var deadlineStr = dday;
@@ -4388,6 +4406,7 @@ async function emailDoSend(targets,subject,body,dday){
     statusEl.textContent='발송 중... '+(i+1)+'/'+targets.length;
   }
   statusEl.textContent='완료: 성공 '+sent+'건, 실패 '+fail+'건';
+  alert('이메일 발송 완료\n\n성공: '+sent+'건\n실패: '+fail+'건');
   // 이력 저장
   var data=emailGetData();
   if(!data.log) data.log=[];
