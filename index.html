@@ -7389,37 +7389,57 @@ function mapRenderMarkers() {
   function afterPreCache() {
     var needGeocode = [];
 
-    mapShowLoading('1단계: 좌표 매칭', '캐시 확인 중... (0/' + total + ')', 5);
+    mapShowLoading('1단계: 좌표 매칭', '캐시 확인 중...', 5);
 
-    // 1단계: 고유 주소 기반 매칭
+    // 1단계: 좌표 매칭 (마커는 아직 안 만듦)
+    var cachedItems = [];
     _mapData.forEach(function(d) {
       if (!d.address) {
         var sc = _sidoCenter[d.sido] || _sidoCenter['미분류'];
         d.lat = sc[0] + (Math.random() - 0.5) * 0.3;
         d.lng = sc[1] + (Math.random() - 0.5) * 0.3;
-        _mapMarkers.push(mapCreateMarker(d));
-        doneCount++;
+        cachedItems.push(d);
       } else if (_mapGeoCache[d.address]) {
         var c = _mapGeoCache[d.address];
         d.lat = c[0]; d.lng = c[1];
-        _mapMarkers.push(mapCreateMarker(d));
-        doneCount++;
+        cachedItems.push(d);
       } else {
         needGeocode.push(d);
       }
     });
 
-    var pct1 = Math.round(doneCount / total * 100);
-    mapShowLoading('1단계 완료', doneCount + '건 즉시 완료 / ' + needGeocode.length + '건 변환 필요', pct1);
-    document.getElementById('mapDataCount').textContent = doneCount + ' / ' + total;
-
-    if (needGeocode.length === 0) {
-      mapApplyFilter();
-      mapShowLoading('완료!', total + '개 건물 표시', 100);
-      setTimeout(mapHideLoading, 1500);
-      return;
+    // 마커 배치 생성 (500개씩, UI 안 멈추게)
+    var mkIdx = 0;
+    var MK_BATCH = 500;
+    function buildMarkerBatch() {
+      if (mkIdx >= cachedItems.length) {
+        doneCount = cachedItems.length;
+        var pct1 = Math.round(doneCount / total * 100);
+        mapShowLoading('1단계 완료', doneCount + '건 마커 생성 / ' + needGeocode.length + '건 변환 필요', pct1);
+        document.getElementById('mapDataCount').textContent = doneCount + ' / ' + total;
+        if (needGeocode.length === 0) {
+          mapApplyFilter();
+          mapShowLoading('완료!', total + '개 건물 표시', 100);
+          setTimeout(mapHideLoading, 1500);
+        } else {
+          startGeocoding();
+        }
+        return;
+      }
+      var end = Math.min(mkIdx + MK_BATCH, cachedItems.length);
+      for (var i = mkIdx; i < end; i++) {
+        _mapMarkers.push(mapCreateMarker(cachedItems[i]));
+      }
+      mkIdx = end;
+      var pct = Math.round(mkIdx / total * 100);
+      mapShowLoading('1단계: 마커 생성 (' + mkIdx + '/' + cachedItems.length + ')', '캐시 적용 중...', pct);
+      document.getElementById('mapDataCount').textContent = mkIdx + ' / ' + total;
+      setTimeout(buildMarkerBatch, 10);
     }
+    buildMarkerBatch();
+    return; // startGeocoding은 buildMarkerBatch 완료 후 호출
 
+    function startGeocoding() {
     // 2단계: 고유 주소만 Geocoding (중복 제거)
     var uniqueAddrs = {};
     needGeocode.forEach(function(d) {
@@ -7493,6 +7513,7 @@ function mapRenderMarkers() {
       setTimeout(processBatch, BATCH_DELAY);
     }
     processBatch();
+    } // end startGeocoding
   }
 
   // geo-cache.json fetch
