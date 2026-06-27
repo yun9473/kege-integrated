@@ -4656,6 +4656,7 @@ function switchTab(id,el){
     el.classList.add('active');
   }
   if(newId==='search') renderDetailTable('all');
+  if(newId==='map'){ setTimeout(function(){ mapInitKakao(); if(_mapObj) _mapObj.relayout(); },200); }
   if(newId==='edu'&&!_eduInitDone){
     var firstChip=document.querySelector('.edu-chip');
     if(firstChip) firstChip.click();
@@ -7467,17 +7468,7 @@ function mapClearData() {
   document.getElementById('mapExcelFile').value = '';
 }
 
-// switchTab 확장 — map 탭 진입 시 지도 초기화
-var _origSwitchTab = switchTab;
-switchTab = function(id, el) {
-  _origSwitchTab(id, el);
-  if (id === 'map') {
-    setTimeout(function() {
-      mapInitKakao();
-      if (_mapObj) _mapObj.relayout();
-    }, 200);
-  }
-};
+// mapInitKakao는 switchTab 내에서 직접 호출됨
 // ════════════ end MAP ════════════
 
 
