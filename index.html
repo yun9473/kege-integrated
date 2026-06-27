@@ -777,6 +777,7 @@ table.dtable tbody tr{cursor:pointer;}
           <div class="s-lbl">메뉴</div>
           <div class="s-item active" id="mi-upload" onclick="showScreen('upload')"><span></span><span style="flex:1">파일 업로드</span></div>
           <div class="s-item" id="mi-status" onclick="showScreen('status')"><span></span><span style="flex:1">수신 현황</span></div>
+          <div class="s-item" id="mi-email" style="display:none" onclick="showScreen('email')"><span></span><span style="flex:1">메일 관리</span></div>
           <div class="s-item" id="mi-admin" style="display:none" onclick="showScreen('admin')"><span></span><span style="flex:1">관리자 설정</span></div>
         </div>
         <div class="s-sec" style="border-top:1px solid #333333;margin-top:auto">
@@ -1042,12 +1043,24 @@ table.dtable tbody tr{cursor:pointer;}
           </div>
         </div>
 
-        <!-- ═══ 알림 이메일 관리 ═══ -->
-        <div class="card">
-          <div class="card-title"> 알림 이메일 관리
-            <button class="btn btn-o btn-sm" style="margin-left:auto" onclick="emailExportExcel()">Excel 내보내기</button>
-          </div>
+      </div>
 
+      <!-- ═══ SCREEN: 메일 관리 ═══ -->
+      <div id="screen-email" class="screen">
+        <div style="font-size:19px;font-weight:500;margin-bottom:16px"> 알림 이메일 관리</div>
+
+        <!-- PA URL 설정 -->
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-title"> 이메일 발송 설정</div>
+          <div class="fg">
+            <label class="fl">Power Automate 이메일 트리거 URL</label>
+            <textarea class="fi" id="a-email-paurl" rows="2" placeholder="https://defaultccb725d9..." style="resize:vertical"></textarea>
+          </div>
+          <button class="btn btn-p btn-sm" onclick="saveEmailPaUrl()">URL 저장</button>
+          <span id="email-pa-status" style="font-size:12px;color:var(--gray);margin-left:8px;"></span>
+        </div>
+
+        <div class="card">
           <!-- D-Day 및 알림 시점 -->
           <div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px;padding:14px;background:var(--gray-l);border-radius:12px;">
             <div class="fg" style="margin-bottom:0;min-width:160px">
@@ -1084,13 +1097,14 @@ table.dtable tbody tr{cursor:pointer;}
           </div>
 
           <!-- 학교별 이메일 테이블 -->
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
             <div style="font-size:12px;font-weight:600;color:var(--text2);">학교별 담당자 이메일</div>
             <label class="btn btn-o btn-sm" style="margin-left:auto;cursor:pointer;">
               Excel 일괄 등록
               <input type="file" accept=".xlsx,.xls" style="display:none" onchange="emailBulkUpload(this)"/>
             </label>
             <button class="btn btn-p btn-sm" onclick="emailSaveAll()">전체 저장</button>
+            <button class="btn btn-o btn-sm" onclick="emailExportExcel()">Excel 내보내기</button>
             <button class="btn btn-sm" style="background:#1d1d1f;color:#fff" onclick="emailSelectAll(true)">일괄 선택</button>
             <button class="btn btn-sm" style="background:#fff;color:#333;border:1px solid #e0e0e0" onclick="emailSelectAll(false)">일괄 해제</button>
           </div>
@@ -1118,7 +1132,8 @@ table.dtable tbody tr{cursor:pointer;}
             </div>
           </div>
         </div>
-        <!-- ═══ end 알림 이메일 관리 ═══ -->
+      </div>
+      <!-- ═══ end 메일 관리 ═══ -->
 
         <div class="card" style="background:var(--red-l);border:1px solid #fca5a5">
           <div class="card-title"> 체크리스트 초기화</div>
@@ -3166,7 +3181,7 @@ async function startApp(label){
   }
   document.getElementById('screen-app').style.display='none';
   document.getElementById('tu').textContent=label;
-  if(role==='admin') document.getElementById('mi-admin').style.display='flex';
+  if(role==='admin') { document.getElementById('mi-admin').style.display='flex'; document.getElementById('mi-email').style.display='flex'; }
   document.getElementById('nav-dashboard').style.display=(role==='admin')?'':'none';
   document.getElementById('nav-research').style.display=(role==='admin')?'':'none';
   if(role==='agency'||role==='admin'){ document.getElementById('ag-tabs').style.display='block'; switchAgTab('bulk'); }
@@ -3202,6 +3217,7 @@ function logout(){
   document.getElementById('lp-admin-login').style.display='block';
   document.getElementById('lp-admin-proj').style.display='none';
   document.getElementById('mi-admin').style.display='none';
+  document.getElementById('mi-email').style.display='none';
   document.getElementById('nav-dashboard').style.display='none';
   document.getElementById('nav-research').style.display='none';
   document.getElementById('nav-upload').click();
@@ -4251,6 +4267,21 @@ function emailBuildTable(){
   emailUpdatePreview();
 }
 
+function saveEmailPaUrl(){
+  var url = document.getElementById('a-email-paurl').value.trim();
+  localStorage.setItem('emailPaUrl', url);
+  document.getElementById('email-pa-status').textContent = url ? '저장됨 ✅' : '삭제됨';
+  toast(url ? '이메일 발송 URL 저장됨' : '이메일 발송 URL 삭제됨', 'success');
+}
+function emailLoadPaUrl(){
+  var url = localStorage.getItem('emailPaUrl') || '';
+  var el = document.getElementById('a-email-paurl');
+  if(el) el.value = url;
+}
+function getEmailPaUrl(){
+  return (localStorage.getItem('emailPaUrl') || '').trim();
+}
+
 function emailSelectAll(checked){
   document.querySelectorAll('.email-check').forEach(function(cb){ cb.checked = checked; });
 }
@@ -4374,8 +4405,8 @@ function emailDirectSend(){
 }
 
 async function emailDoSend(targets,subject,body,dday){
-  var paUrl = cfg().paUrl;
-  if(!paUrl){ toast('Power Automate URL이 설정되지 않았습니다','error'); return; }
+  var paUrl = getEmailPaUrl();
+  if(!paUrl){ toast('이메일 발송 URL이 설정되지 않았습니다. 메일 관리 탭에서 URL을 먼저 저장해주세요.','error'); return; }
   var d = calcDday(dday);
   var deadlineStr = dday;
   var logEl = document.getElementById('email-log');
@@ -4420,11 +4451,6 @@ async function emailDoSend(targets,subject,body,dday){
 }
 
 // buildCodeTable 호출 시 이메일 테이블도 같이 빌드
-var _origBuildCodeTable = buildCodeTable;
-buildCodeTable = function(){
-  _origBuildCodeTable();
-  emailBuildTable();
-};
 // ═══ end 알림 이메일 관리 JS ═══
 
 function closeModal(){
@@ -4483,6 +4509,7 @@ function showScreen(n){
   const mi=document.getElementById('mi-'+n); if(mi) mi.classList.add('active');
   if(n==='status') buildStatusScreen();
   if(n==='admin')  buildCodeTable();
+  if(n==='email')  { emailBuildTable(); emailLoadPaUrl(); }
   var m=document.querySelector('.main');if(m)m.scrollTop=0;window.scrollTo(0,0);
 }
 function setPg(which,text,pct){
