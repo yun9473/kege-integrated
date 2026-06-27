@@ -440,6 +440,9 @@ body{font-family:'Pretendard',system-ui,-apple-system,'Apple SD Gothic Neo',sans
 .map-sido-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:9999px;font-size:11px;cursor:pointer;border:1px solid #e0e0e0;background:#fff;color:#333;transition:.12s;}
 .map-sido-chip.active{background:var(--blue);color:#fff;border-color:var(--blue);}
 .map-sido-chip:hover:not(.active){background:#f0f5ff;}
+.map-subtab{padding:10px 18px;font-size:13px;font-weight:600;color:#7a7a7a;cursor:pointer;border:none;background:none;border-bottom:3px solid transparent;font-family:inherit;transition:.15s;}
+.map-subtab.active{color:#1d1d1f;border-bottom-color:#0066cc;}
+.map-subtab:hover:not(.active){color:#0066cc;}
 .kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;}
 .kpi-card{background:#fff;border-radius:18px;padding:14px 16px;border-left:none;border:1px solid #e0e0e0;}
 .kpi-card.red{border-left:none;}.kpi-card.orange{border-left:none;}.kpi-card.green{border-left:none;}.kpi-card.purple{border-left:none;}.kpi-card.navy{border-left:none;}
@@ -2022,8 +2025,11 @@ table.dtable tbody tr{cursor:pointer;}
 <div class="main" style="padding:0;display:flex;flex-direction:column;height:calc(100vh - 110px);">
 
   <!-- 상단 컨트롤 -->
-  <div style="padding:16px 24px;border-bottom:1px solid #e0e0e0;display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#fff;z-index:10;">
-    <div style="font-size:15px;font-weight:700;color:#1d1d1f;">🗺 전국 교육시설 위험도 지도</div>
+  <div style="padding:12px 24px;border-bottom:1px solid #e0e0e0;display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#fff;z-index:10;">
+    <div style="display:flex;border-bottom:2px solid transparent;gap:0;">
+      <button id="mapSubTab-map" class="map-subtab active" onclick="mapSwitchSub('map')">🗺 지도 현황</button>
+      <button id="mapSubTab-region" class="map-subtab" onclick="mapSwitchSub('region')">📊 지역별 비교</button>
+    </div>
     <div style="margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
       <label class="map-upload-btn" style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;background:var(--blue);color:#fff;border-radius:9999px;font-size:12px;font-weight:600;cursor:pointer;">
         📂 엑셀 업로드
@@ -2034,8 +2040,8 @@ table.dtable tbody tr{cursor:pointer;}
     </div>
   </div>
 
-  <!-- 본문: 필터 + 지도 + 통계 -->
-  <div style="display:flex;flex:1;overflow:hidden;">
+  <!-- 소분류: 지도 뷰 -->
+  <div id="mapSubView-map" style="display:flex;flex:1;overflow:hidden;">
 
     <!-- 왼쪽 필터 패널 -->
     <div id="mapFilterPanel" style="width:240px;background:#fafafa;border-right:1px solid #e0e0e0;overflow-y:auto;padding:16px;flex-shrink:0;">
@@ -2111,8 +2117,9 @@ table.dtable tbody tr{cursor:pointer;}
     </div>
   </div>
 
-  <!-- 지역별 비교 대시보드 -->
-  <div id="mapRegionDashboard" style="display:none;border-top:1px solid #e0e0e0;background:#fafafa;overflow-y:auto;max-height:420px;">
+  </div>
+  <!-- 소분류: 지역별 비교 뷰 -->
+  <div id="mapSubView-region" style="display:none;flex:1;overflow-y:auto;background:#fafafa;">
     <div style="padding:16px 24px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
         <div style="font-size:15px;font-weight:700;color:#1d1d1f;">📊 지역별 비교 분석</div>
@@ -2137,8 +2144,8 @@ table.dtable tbody tr{cursor:pointer;}
     </div>
   </div>
 
-</div>
-</div>
+</div><!-- end tab-map main -->
+</div><!-- end tab-map -->
 
 <!-- 경기 2026 평가지표 원본 (숨김, JS에서 참조) -->
 <div id="edu-gy26-ind-src" style="display:none;">
@@ -7772,116 +7779,149 @@ function mapUpdateStats() {
   document.getElementById('mapStatsOverlay').style.display = 'block';
 }
 
-function mapBuildRegionDashboard() {
-  if (!_mapData.length) return;
-  document.getElementById('mapRegionDashboard').style.display = 'block';
-  mapRegionView('sido');
+function mapSwitchSub(view) {
+  document.getElementById('mapSubView-map').style.display = view === 'map' ? 'flex' : 'none';
+  document.getElementById('mapSubView-region').style.display = view === 'region' ? 'block' : 'none';
+  document.getElementById('mapSubTab-map').classList.toggle('active', view === 'map');
+  document.getElementById('mapSubTab-region').classList.toggle('active', view === 'region');
+  if (view === 'map' && _mapObj) _mapObj.relayout();
+  if (view === 'region' && _mapData.length) mapRegionView('sido');
 }
 
+function mapBuildRegionDashboard() {
+  if (!_mapData.length) return;
+}
+
+var _regionSelectedSido = null;
+
 function mapRegionView(mode) {
-  // 버튼 활성화
-  var btns = document.querySelectorAll('#mapRegionDashboard .btn');
-  btns.forEach(function(b) {
-    if ((mode === 'sido' && b.textContent === '시도별') || (mode === 'sigungu' && b.textContent === '시군구별')) {
-      b.style.background = '#1d1d1f'; b.style.color = '#fff'; b.style.border = 'none';
-    } else {
-      b.style.background = '#fff'; b.style.color = '#333'; b.style.border = '1px solid #e0e0e0';
-    }
+  var container = document.getElementById('mapSubView-region');
+  if (!_mapData.length) { container.innerHTML = '<div style="padding:40px;text-align:center;color:#7a7a7a;">데이터를 먼저 업로드하세요</div>'; return; }
+
+  // 시도별 집계
+  var sidoMap = {};
+  _mapData.forEach(function(d) {
+    if (!sidoMap[d.sido]) sidoMap[d.sido] = { danger:0, warning:0, caution:0, good:0, unknown:0, schools:new Set(), ages:[] };
+    var sm = sidoMap[d.sido];
+    sm[d.gradeInfo.key] = (sm[d.gradeInfo.key]||0) + 1;
+    sm.schools.add(d.school);
+    if (d.year) sm.ages.push(new Date().getFullYear() - parseInt(d.year));
+  });
+  var sidoKeys = Object.keys(sidoMap).sort(function(a,b){ return (sidoMap[b].danger+sidoMap[b].warning)-(sidoMap[a].danger+sidoMap[a].warning); });
+
+  if (mode === 'sigungu' && _regionSelectedSido) {
+    renderSigunguView(container, _regionSelectedSido);
+    return;
+  }
+
+  // 시도별 카드 뷰
+  var html = '<div style="padding:20px 24px;">';
+  html += '<div style="font-size:16px;font-weight:700;margin-bottom:16px;color:#1d1d1f;">📊 시도별 위험도 현황</div>';
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">';
+
+  sidoKeys.forEach(function(sido) {
+    var s = sidoMap[sido];
+    var total = s.danger + s.warning + s.caution + s.good + s.unknown;
+    var avgAge = s.ages.length ? Math.round(s.ages.reduce(function(a,b){return a+b;},0)/s.ages.length) : 0;
+    var pD = total>0 ? (s.danger/total*100) : 0;
+    var pW = total>0 ? (s.warning/total*100) : 0;
+    var pC = total>0 ? (s.caution/total*100) : 0;
+    var pG = total>0 ? (s.good/total*100) : 0;
+    var pU = total>0 ? (s.unknown/total*100) : 0;
+
+    html += '<div style="background:#fff;border:1px solid #e0e0e0;border-radius:14px;padding:16px 18px;cursor:pointer;transition:.15s;hover:transform:scale(1.01)" onclick="mapRegionDrillDown(\'' + sido + '\')">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
+    html += '<div style="font-size:15px;font-weight:700;">' + sido + '</div>';
+    html += '<div style="font-size:11px;color:#888;">' + s.schools.size + '교 · 평균 ' + avgAge + '년 ▸</div>';
+    html += '</div>';
+
+    // 스택 바
+    html += '<div style="display:flex;height:12px;border-radius:6px;overflow:hidden;margin-bottom:10px;">';
+    if (pD > 0) html += '<div style="width:'+pD+'%;background:#dc2626;" title="위험 '+s.danger+'"></div>';
+    if (pW > 0) html += '<div style="width:'+pW+'%;background:#d97706;" title="경계 '+s.warning+'"></div>';
+    if (pC > 0) html += '<div style="width:'+pC+'%;background:#0066cc;" title="주의 '+s.caution+'"></div>';
+    if (pG > 0) html += '<div style="width:'+pG+'%;background:#059669;" title="양호 '+s.good+'"></div>';
+    if (pU > 0) html += '<div style="width:'+pU+'%;background:#ccc;" title="미분류 '+s.unknown+'"></div>';
+    html += '</div>';
+
+    // 등급별 수치
+    html += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
+    if (s.danger) html += '<span style="background:#fef2f2;color:#dc2626;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600;">위험 '+s.danger+'</span>';
+    if (s.warning) html += '<span style="background:#fffbeb;color:#d97706;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600;">경계 '+s.warning+'</span>';
+    if (s.caution) html += '<span style="background:#f0f5ff;color:#0066cc;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600;">주의 '+s.caution+'</span>';
+    if (s.good) html += '<span style="background:#ecfdf5;color:#059669;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600;">양호 '+s.good+'</span>';
+    if (s.unknown) html += '<span style="background:#f5f5f7;color:#7a7a7a;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600;">미분류 '+s.unknown+'</span>';
+    html += '</div>';
+    html += '</div>';
   });
 
-  var regions = {};
+  html += '</div></div>';
+  container.innerHTML = html;
+}
+
+function mapRegionDrillDown(sido) {
+  _regionSelectedSido = sido;
+  renderSigunguView(document.getElementById('mapSubView-region'), sido);
+}
+
+function renderSigunguView(container, sido) {
+  // 시군구 집계
+  var sggMap = {};
   _mapData.forEach(function(d) {
-    var key = mode === 'sido' ? d.sido : (d.sido + ' ' + mapParseSigungu(d.address));
-    if (!key.trim() || key.includes('undefined')) key = d.sido + ' 기타';
-    if (!regions[key]) regions[key] = { total: 0, danger: 0, warning: 0, caution: 0, good: 0, unknown: 0, schools: new Set(), ages: [] };
-    var r = regions[key];
-    r.total++;
-    r[d.gradeInfo.key] = (r[d.gradeInfo.key] || 0) + 1;
+    if (d.sido !== sido) return;
+    var sgg = mapParseSigungu(d.address) || '기타';
+    if (!sggMap[sgg]) sggMap[sgg] = { danger:0, warning:0, caution:0, good:0, unknown:0, schools:new Set(), ages:[] };
+    var r = sggMap[sgg];
+    r[d.gradeInfo.key] = (r[d.gradeInfo.key]||0) + 1;
     r.schools.add(d.school);
     if (d.year) r.ages.push(new Date().getFullYear() - parseInt(d.year));
   });
+  var sggKeys = Object.keys(sggMap).sort(function(a,b){ return (sggMap[b].danger+sggMap[b].warning)-(sggMap[a].danger+sggMap[a].warning); });
 
-  // 카드
-  var cardsEl = document.getElementById('mapRegionCards');
-  var sorted = Object.keys(regions).sort(function(a, b) { return (regions[b].danger + regions[b].warning) - (regions[a].danger + regions[a].warning); });
-  var html = '';
-  sorted.forEach(function(key) {
-    var r = regions[key];
-    var dangerPct = r.total > 0 ? Math.round((r.danger + r.warning) / r.total * 100) : 0;
-    var avgAge = r.ages.length > 0 ? Math.round(r.ages.reduce(function(a, b) { return a + b; }, 0) / r.ages.length) : 0;
-    var barColor = dangerPct >= 50 ? '#dc2626' : dangerPct >= 30 ? '#d97706' : dangerPct >= 10 ? '#0066cc' : '#059669';
-    html += '<div style="background:#fff;border:1px solid #e0e0e0;border-radius:12px;padding:14px 16px;">' +
-      '<div style="font-size:13px;font-weight:700;margin-bottom:6px;">' + key + '</div>' +
-      '<div style="display:flex;justify-content:space-between;font-size:11px;color:#555;margin-bottom:8px;">' +
-        '<span>' + r.schools.size + '교 / ' + r.total + '동</span>' +
-        '<span>평균 ' + avgAge + '년</span>' +
-      '</div>' +
-      '<div style="background:#eee;border-radius:4px;height:8px;margin-bottom:6px;">' +
-        '<div style="width:' + dangerPct + '%;height:100%;background:' + barColor + ';border-radius:4px;"></div>' +
-      '</div>' +
-      '<div style="display:flex;justify-content:space-between;font-size:10px;">' +
-        '<span style="color:#dc2626;">위험 ' + r.danger + '</span>' +
-        '<span style="color:#d97706;">경계 ' + r.warning + '</span>' +
-        '<span style="color:#0066cc;">주의 ' + r.caution + '</span>' +
-        '<span style="color:#059669;">양호 ' + r.good + '</span>' +
-      '</div>' +
-    '</div>';
-  });
-  cardsEl.innerHTML = html;
+  var html = '<div style="padding:20px 24px;">';
+  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">';
+  html += '<button onclick="_regionSelectedSido=null;mapRegionView(\'sido\')" style="background:none;border:1px solid #e0e0e0;border-radius:9999px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:inherit;">← 시도별</button>';
+  html += '<div style="font-size:16px;font-weight:700;color:#1d1d1f;">' + sido + ' 시군구별 현황</div>';
+  html += '</div>';
 
-  // 막대 차트 (CSS 기반, Chart.js 안 쓰고 가벼운 HTML)
-  var barEl = document.getElementById('mapRegionBarChart');
-  var maxDanger = 0;
-  sorted.forEach(function(k) { var v = regions[k].danger + regions[k].warning; if (v > maxDanger) maxDanger = v; });
-  var barHtml = '';
-  sorted.slice(0, 20).forEach(function(key) {
-    var r = regions[key];
-    var dangerCnt = r.danger + r.warning;
-    var w = maxDanger > 0 ? Math.round(dangerCnt / maxDanger * 100) : 0;
-    barHtml += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">' +
-      '<div style="width:80px;font-size:10px;text-align:right;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + key + '">' + key + '</div>' +
-      '<div style="flex:1;background:#eee;border-radius:3px;height:14px;">' +
-        '<div style="width:' + w + '%;height:100%;background:linear-gradient(90deg,#d97706,#dc2626);border-radius:3px;display:flex;align-items:center;justify-content:flex-end;padding-right:4px;">' +
-          (w > 15 ? '<span style="font-size:9px;color:#fff;font-weight:700;">' + dangerCnt + '</span>' : '') +
-        '</div>' +
-      '</div>' +
-      (w <= 15 ? '<span style="font-size:9px;color:#666;">' + dangerCnt + '</span>' : '') +
-    '</div>';
-  });
-  barEl.innerHTML = barHtml;
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;">';
 
-  // 경과연수 분포 차트
-  var ageEl = document.getElementById('mapRegionAgeChart');
-  var ageHtml = '';
-  var maxTotal = 0;
-  sorted.forEach(function(k) { if (regions[k].total > maxTotal) maxTotal = regions[k].total; });
-  sorted.slice(0, 20).forEach(function(key) {
-    var r = regions[key];
-    var a50 = 0, a45 = 0, a40 = 0, aLt = 0;
-    r.ages.forEach(function(a) { if (a >= 50) a50++; else if (a >= 45) a45++; else if (a >= 40) a40++; else aLt++; });
-    var tw = maxTotal > 0 ? Math.round(r.total / maxTotal * 100) : 0;
-    var p50 = r.total > 0 ? Math.round(a50 / r.total * tw) : 0;
-    var p45 = r.total > 0 ? Math.round(a45 / r.total * tw) : 0;
-    var p40 = r.total > 0 ? Math.round(a40 / r.total * tw) : 0;
-    var pLt = tw - p50 - p45 - p40;
-    ageHtml += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">' +
-      '<div style="width:80px;font-size:10px;text-align:right;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + key + '">' + key + '</div>' +
-      '<div style="flex:1;display:flex;height:14px;border-radius:3px;overflow:hidden;background:#eee;">' +
-        (p50 > 0 ? '<div style="width:' + p50 + '%;background:#dc2626;" title="50년+: ' + a50 + '"></div>' : '') +
-        (p45 > 0 ? '<div style="width:' + p45 + '%;background:#d97706;" title="45~49년: ' + a45 + '"></div>' : '') +
-        (p40 > 0 ? '<div style="width:' + p40 + '%;background:#0066cc;" title="40~44년: ' + a40 + '"></div>' : '') +
-        (pLt > 0 ? '<div style="width:' + pLt + '%;background:#059669;" title="40년 미만: ' + aLt + '"></div>' : '') +
-      '</div>' +
-      '<span style="font-size:9px;color:#666;">' + r.total + '</span>' +
-    '</div>';
+  sggKeys.forEach(function(sgg) {
+    var r = sggMap[sgg];
+    var total = r.danger + r.warning + r.caution + r.good + r.unknown;
+    var avgAge = r.ages.length ? Math.round(r.ages.reduce(function(a,b){return a+b;},0)/r.ages.length) : 0;
+    var pD = total>0 ? (r.danger/total*100) : 0;
+    var pW = total>0 ? (r.warning/total*100) : 0;
+    var pC = total>0 ? (r.caution/total*100) : 0;
+    var pG = total>0 ? (r.good/total*100) : 0;
+    var pU = total>0 ? (r.unknown/total*100) : 0;
+
+    html += '<div style="background:#fff;border:1px solid #e0e0e0;border-radius:14px;padding:14px 16px;">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">';
+    html += '<div style="font-size:14px;font-weight:700;">' + sgg + '</div>';
+    html += '<div style="font-size:11px;color:#888;">' + r.schools.size + '교 · 평균 ' + avgAge + '년</div>';
+    html += '</div>';
+
+    html += '<div style="display:flex;height:10px;border-radius:5px;overflow:hidden;margin-bottom:8px;">';
+    if (pD > 0) html += '<div style="width:'+pD+'%;background:#dc2626;"></div>';
+    if (pW > 0) html += '<div style="width:'+pW+'%;background:#d97706;"></div>';
+    if (pC > 0) html += '<div style="width:'+pC+'%;background:#0066cc;"></div>';
+    if (pG > 0) html += '<div style="width:'+pG+'%;background:#059669;"></div>';
+    if (pU > 0) html += '<div style="width:'+pU+'%;background:#ccc;"></div>';
+    html += '</div>';
+
+    html += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
+    if (r.danger) html += '<span style="background:#fef2f2;color:#dc2626;padding:2px 7px;border-radius:9999px;font-size:10px;font-weight:600;">위험 '+r.danger+'</span>';
+    if (r.warning) html += '<span style="background:#fffbeb;color:#d97706;padding:2px 7px;border-radius:9999px;font-size:10px;font-weight:600;">경계 '+r.warning+'</span>';
+    if (r.caution) html += '<span style="background:#f0f5ff;color:#0066cc;padding:2px 7px;border-radius:9999px;font-size:10px;font-weight:600;">주의 '+r.caution+'</span>';
+    if (r.good) html += '<span style="background:#ecfdf5;color:#059669;padding:2px 7px;border-radius:9999px;font-size:10px;font-weight:600;">양호 '+r.good+'</span>';
+    if (r.unknown) html += '<span style="background:#f5f5f7;color:#7a7a7a;padding:2px 7px;border-radius:9999px;font-size:10px;font-weight:600;">미분류 '+r.unknown+'</span>';
+    html += '</div>';
+    html += '</div>';
   });
-  ageHtml += '<div style="display:flex;gap:12px;margin-top:8px;font-size:10px;color:#555;">' +
-    '<span><span style="display:inline-block;width:8px;height:8px;background:#dc2626;border-radius:2px;"></span> 50년+</span>' +
-    '<span><span style="display:inline-block;width:8px;height:8px;background:#d97706;border-radius:2px;"></span> 45~49</span>' +
-    '<span><span style="display:inline-block;width:8px;height:8px;background:#0066cc;border-radius:2px;"></span> 40~44</span>' +
-    '<span><span style="display:inline-block;width:8px;height:8px;background:#059669;border-radius:2px;"></span> &lt;40</span>' +
-  '</div>';
-  ageEl.innerHTML = ageHtml;
+
+  html += '</div></div>';
+  container.innerHTML = html;
 }
 
 function mapClearData() {
