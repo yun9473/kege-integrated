@@ -2116,10 +2116,15 @@ table.dtable tbody tr{cursor:pointer;}
         <button id="mapTypeSkyview" onclick="mapSetType('skyview')" style="padding:7px 14px;font-size:11px;font-weight:600;border:none;cursor:pointer;background:transparent;color:#666;font-family:inherit;">위성</button>
         <button id="mapTypeHybrid" onclick="mapSetType('hybrid')" style="padding:7px 14px;font-size:11px;font-weight:600;border:none;cursor:pointer;background:transparent;color:#666;font-family:inherit;">하이브리드</button>
       </div>
-      <!-- 지도 위 통계 오버레이 -->
-      <div id="mapStatsOverlay" style="position:absolute;top:12px;right:12px;background:rgba(255,255,255,0.95);border-radius:12px;padding:14px 18px;box-shadow:0 2px 8px rgba(0,0,0,0.1);min-width:200px;">
+      <!-- 지도 위 통계 오버레이 (항상 고정) -->
+      <div id="mapStatsOverlay" style="position:absolute;top:12px;right:12px;background:rgba(255,255,255,0.97);border-radius:12px;padding:14px 18px;box-shadow:0 2px 8px rgba(0,0,0,0.12);min-width:200px;z-index:10;">
         <div style="font-size:12px;font-weight:700;margin-bottom:8px;color:#1d1d1f;">📊 현황 요약</div>
         <div id="mapStatsContent" style="font-size:11px;color:#333;line-height:1.8;"></div>
+      </div>
+      <!-- 지도 컨트롤 버튼 -->
+      <div style="position:absolute;top:50px;left:12px;z-index:5;display:flex;flex-direction:column;gap:4px;">
+        <button onclick="mapGoFullView()" style="padding:7px 12px;font-size:11px;font-weight:600;border:none;cursor:pointer;background:#fff;color:#1d1d1f;font-family:inherit;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,0.12);">🗺 전국 보기</button>
+        <button onclick="mapToggleFullscreen()" id="mapFullscreenBtn" style="padding:7px 12px;font-size:11px;font-weight:600;border:none;cursor:pointer;background:#fff;color:#1d1d1f;font-family:inherit;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,0.12);">⛶ 전체화면</button>
       </div>
       <!-- 드래그앤드롭 오버레이 -->
       <div id="mapDropOverlay" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,102,204,0.12);border:3px dashed var(--blue);z-index:30;pointer-events:none;align-items:center;justify-content:center;">
@@ -8188,6 +8193,28 @@ function mapGetGradeByMode(score, maxScore) {
   if (score >= 5) return { label: '경계', color: '#d97706', key: 'warning' };
   if (score >= 3) return { label: '주의', color: '#0066cc', key: 'caution' };
   return { label: '양호', color: '#059669', key: 'good' };
+}
+
+function mapGoFullView() {
+  if (!_mapObj) return;
+  _mapObj.setCenter(new kakao.maps.LatLng(36.5, 127.5));
+  _mapObj.setLevel(12);
+}
+
+function mapToggleFullscreen() {
+  var tabMap = document.getElementById('tab-map');
+  var main = tabMap.querySelector('.main');
+  var btn = document.getElementById('mapFullscreenBtn');
+  if (main.style.position === 'fixed') {
+    main.style.position = ''; main.style.top = ''; main.style.left = '';
+    main.style.width = ''; main.style.height = ''; main.style.zIndex = '';
+    btn.textContent = '⛶ 전체화면';
+  } else {
+    main.style.position = 'fixed'; main.style.top = '0'; main.style.left = '0';
+    main.style.width = '100vw'; main.style.height = '100vh'; main.style.zIndex = '9999';
+    btn.textContent = '✕ 나가기';
+  }
+  if (_mapObj) setTimeout(function(){ _mapObj.relayout(); }, 200);
 }
 
 function mapSetType(type) {
