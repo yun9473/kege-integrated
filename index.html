@@ -8,7 +8,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js"></script>
-<script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=25ae0c7c8645b6a47989ca839f19729a&libraries=services,clusterer&autoload=false"></script>
+<script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=25ae0c7c8645b6a47989ca839f19729a&libraries=services,clusterer"></script>
 <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/gh/moonspam/NanumSquare@2.0/nanumsquare.css" rel="stylesheet">
 <style>
@@ -7192,6 +7192,7 @@ var _mapGeoCache = {};
 function mapInitKakao() {
   if (_mapInited) return;
   try {
+    if (typeof kakao === 'undefined' || !kakao.maps) { console.warn('Kakao SDK 미로드'); return; }
     kakao.maps.load(function() {
       var container = document.getElementById('mapContainer');
       _mapObj = new kakao.maps.Map(container, {
@@ -7208,17 +7209,6 @@ function mapInitKakao() {
         ]
       });
       _mapInited = true;
-      // localStorage 캐시 복원
-      var cached = localStorage.getItem('mapSchoolData');
-      if (cached) {
-        try {
-          _mapData = JSON.parse(cached);
-          document.getElementById('mapEmptyMsg').style.display = 'none';
-          mapRenderMarkers();
-          mapBuildSidoFilters();
-          mapUpdateStats();
-        } catch(e) {}
-      }
     });
   } catch(e) {
     console.warn('Kakao Map SDK 로드 실패:', e);
@@ -7327,7 +7317,6 @@ function mapLoadExcel(input) {
     }).filter(function(d) { return d.school || d.address; });
 
     mapShowLoading('데이터 파싱 완료', _mapData.length + '건 로드, 좌표 변환 시작...', 10);
-    localStorage.setItem('mapSchoolData', JSON.stringify(_mapData));
     document.getElementById('mapEmptyMsg').style.display = 'none';
     mapBuildSidoFilters();
     mapUpdateStats();
@@ -7592,7 +7581,6 @@ function mapClearData() {
   _mapMarkers.forEach(function(m) { m.setMap(null); });
   _mapMarkers = [];
   if (_mapClusterer) _mapClusterer.clear();
-  localStorage.removeItem('mapSchoolData');
   document.getElementById('mapEmptyMsg').style.display = '';
   document.getElementById('mapStatsOverlay').style.display = 'none';
   document.getElementById('mapDataCount').textContent = '';
