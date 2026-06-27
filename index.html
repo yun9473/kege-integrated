@@ -7236,14 +7236,42 @@ async function hwpxRun() {
 }
 // ════════════ end HWPX ════════════
 
-// ════════════ MAP TAB ════════════
-var _mapData = [];
-var _mapMarkers = [];
-var _mapClusterer = null;
-var _mapObj = null;
-var _mapInited = false;
-var _mapGeoCache = {};
+// ════════════ MAP TAB (v2 리팩토링) ════════════
+var MAP_DEBUG = false;
+function mlog() { if (MAP_DEBUG) console.log.apply(console, arguments); }
 
+// ── 전역 상태 ──
+var M = {
+  data: [],              // 전체 데이터 배열
+  dataById: new Map(),   // id → data
+  dataByAddr: new Map(), // address → [lat,lng]
+  map: null,             // kakao.maps.Map
+  clusterer: null,       // MarkerClusterer
+  markerImages: {},      // key → MarkerImage (5개)
+  infoWindow: null,      // 전역 InfoWindow 1개
+  markerPool: new Map(), // id → Marker (재사용)
+  activeIds: new Set(),  // 현재 clusterer에 등록된 id
+  ready: false,
+  initPromise: null,
+  viewTimer: null,
+  scoreMode: 'both',     // 'both','safety','age'
+  lastBounds: null,
+};
+// ── GeoCacheManager ──
+var GeoCache = {
+  mem: {},
+  load: function() { try { var c=localStorage.getItem('mapGeoCache'); if(c) this.mem=JSON.parse(c); } catch(e){} },
+  get: function(addr) { return this.mem[addr]||null; },
+  set: function(addr,lat,lng) { this.mem[addr]=[lat,lng]; },
+  save: function() { try { localStorage.setItem('mapGeoCache',JSON.stringify(this.mem)); } catch(e){} },
+  fetchServer: function() {
+    return fetch('data/geo-cache.json').then(function(r){ return r.ok?r.json():{}; }).then(function(sc){
+      var cnt=0; for(var k in sc){ if(!GeoCache.mem[k]){ GeoCache.mem[k]=sc[k]; cnt++; } } mlog('GeoCache server:',cnt); return cnt;
+    }).catch(function(){ return 0; });
+  }
+};
+
+// ── MapManager ──
 var _mapInitPromise = null;
 function mapInitKakao() {
   if (_mapInitPromise) return _mapInitPromise;
@@ -7579,7 +7607,7 @@ var _currentVisibleIds = new Set();
 function mapUpdateViewport() {
   if (!_mapObj || !_mapReady) return;
   if (_mapViewTimer) clearTimeout(_mapViewTimer);
-  _mapViewTimer = setTimeout(_doUpdateViewport, 200);
+  _mapViewTimer = setTimeout(_doUpdateViewport, 300);
 }
 
 function _doUpdateViewport() {
@@ -7588,7 +7616,7 @@ function _doUpdateViewport() {
   var sLat = sw.getLat(), sLng = sw.getLng(), nLat = ne.getLat(), nLng = ne.getLng();
   var zoom = _mapObj.getLevel();
 
-  // 필터 수집
+  // 필터 수집 (1회만)
   var gradeFilter = {};
   document.querySelectorAll('#tab-map input[data-grade]').forEach(function(cb) {
     gradeFilter[cb.dataset.grade] = cb.checked;
@@ -7600,63 +7628,112 @@ function _doUpdateViewport() {
   var allSido = Object.values(sidoFilter).every(function(v) { return !v; });
   var minElapsed = parseInt(document.getElementById('mapYearSlider').value) || 0;
   document.getElementById('mapYearVal').textContent = minElapsed + '년+';
+  var curYear = new Date().getFullYear();
 
-  // 뷰포트 + 필터 통과 데이터 수집
-  var visibleData = [];
+  // 뷰포트 + 필터 → 새 ID Set
+  var newIds = new Set();
+  var MAX = zoom <= 8 ? 2000 : zoom <= 10 ? 5000 : 999999;
+  var candidates = [];
   for (var i = 0; i < _mapData.length; i++) {
     var d = _mapData[i];
     if (!d.lat || !d.lng) continue;
     if (d.lat < sLat || d.lat > nLat || d.lng < sLng || d.lng > nLng) continue;
     if (!gradeFilter[d.gradeInfo.key]) continue;
     if (!allSido && !sidoFilter[d.sido]) continue;
-    if (minElapsed > 0 && d.year && (new Date().getFullYear() - parseInt(d.year)) < minElapsed) continue;
-    visibleData.push(d);
+    if (minElapsed > 0 && d.year && (curYear - d.year) < minElapsed) continue;
+    candidates.push(d);
   }
-
-  // 줌 레벨에 따라 마커 수 제한 (축소 시만 샘플링, 확대 시 전부 표시)
-  var MAX_MARKERS = zoom <= 8 ? 2000 : zoom <= 10 ? 5000 : 999999;
-  if (visibleData.length > MAX_MARKERS) {
-    visibleData.sort(function(a, b) { return (b.risk ? b.risk.total : 0) - (a.risk ? a.risk.total : 0); });
-    visibleData = visibleData.slice(0, MAX_MARKERS);
+  if (candidates.length > MAX) {
+    candidates.sort(function(a, b) { return (b.risk ? b.risk.total : 0) - (a.risk ? a.risk.total : 0); });
+    candidates = candidates.slice(0, MAX);
   }
+  for (var j = 0; j < candidates.length; j++) newIds.add(candidates[j].id);
 
-  // 새로 보이는 것 / 사라지는 것 비교
-  var newIds = new Set();
-  visibleData.forEach(function(d) { newIds.add(d.id); });
+  // 변경 없으면 스킵
+  var changed = false;
+  if (newIds.size !== _currentVisibleIds.size) changed = true;
+  if (!changed) { newIds.forEach(function(id) { if (!_currentVisibleIds.has(id)) changed = true; }); }
+  if (!changed) { mapUpdateStatsFromCandidates(candidates, sLat, sLng, nLat, nLng, zoom); return; }
 
-  // 사라진 마커 제거
-  var toRemove = [];
+  // diff: 제거할 마커
+  var removeList = [];
   _currentVisibleIds.forEach(function(id) {
-    if (!newIds.has(id) && _markerPool[id]) {
-      toRemove.push(id);
-    }
+    if (!newIds.has(id)) removeList.push(id);
   });
-
-  // 새로 추가할 마커
-  var toAdd = [];
+  // diff: 추가할 마커
+  var addList = [];
   newIds.forEach(function(id) {
-    if (!_currentVisibleIds.has(id)) toAdd.push(id);
+    if (!_currentVisibleIds.has(id)) addList.push(id);
   });
 
-  // 변경이 없으면 스킵
-  if (toRemove.length === 0 && toAdd.length === 0) return;
-
-  // 클러스터러 갱신 (전체 재구성이 가장 빠름)
-  if (_mapClusterer) _mapClusterer.clear();
-  _mapMarkers = [];
-
-  visibleData.forEach(function(d) {
-    var m = _markerPool[d.id];
-    if (!m) {
-      m = mapCreateMarker(d);
-      _markerPool[d.id] = m;
+  // 개별 제거/추가 (clear+addMarkers 안 함)
+  if (_mapClusterer) {
+    // 제거
+    for (var ri = 0; ri < removeList.length; ri++) {
+      var rm = _markerPool[removeList[ri]];
+      if (rm) _mapClusterer.removeMarker(rm);
     }
-    _mapMarkers.push(m);
-  });
+    // 추가
+    var addMarkers = [];
+    for (var ai = 0; ai < addList.length; ai++) {
+      var ad = _mapData[addList[ai]];
+      if (!ad) continue;
+      var am = _markerPool[addList[ai]];
+      if (!am) { am = mapCreateMarker(ad); _markerPool[addList[ai]] = am; }
+      addMarkers.push(am);
+    }
+    if (addMarkers.length > 0) _mapClusterer.addMarkers(addMarkers);
+  }
 
-  if (_mapClusterer) _mapClusterer.addMarkers(_mapMarkers);
+  // _mapMarkers 갱신
+  _mapMarkers = [];
+  newIds.forEach(function(id) { if (_markerPool[id]) _mapMarkers.push(_markerPool[id]); });
   _currentVisibleIds = newIds;
-  mapUpdateStatsForViewport();
+  mapUpdateStatsFromCandidates(candidates, sLat, sLng, nLat, nLng, zoom);
+}
+
+function mapUpdateStatsFromCandidates(candidates, sLat, sLng, nLat, nLng, zoom) {
+  var stats = { danger:0, warning:0, caution:0, good:0, unknown:0 };
+  var schools = new Set();
+  var regionCounts = {};
+  for (var i = 0; i < candidates.length; i++) {
+    var d = candidates[i];
+    stats[d.gradeInfo.key] = (stats[d.gradeInfo.key]||0) + 1;
+    schools.add(d.school);
+    var sgg = d.sido + ' ' + mapParseSigungu(d.address);
+    regionCounts[sgg] = (regionCounts[sgg]||0) + 1;
+  }
+  var topRegion = '', topCount = 0;
+  for (var r in regionCounts) { if (regionCounts[r] > topCount) { topCount = regionCounts[r]; topRegion = r; } }
+  var regionKeys = Object.keys(regionCounts);
+  var regionLabel = regionKeys.length <= 3 ? regionKeys.join(', ') : topRegion + ' 외 ' + (regionKeys.length-1) + '개 지역';
+  var visible = candidates.length;
+
+  var el = document.getElementById('mapStatsContent');
+  var h = '<div style="font-size:12px;font-weight:700;margin-bottom:4px;color:#1d1d1f;">' + regionLabel + '</div>' +
+    '<div>학교: <strong>' + schools.size + '교</strong> (' + visible + '동)</div>' +
+    '<div style="color:#dc2626">🔴 위험: <strong>' + stats.danger + '</strong></div>' +
+    '<div style="color:#d97706">🟠 경계: <strong>' + stats.warning + '</strong></div>' +
+    '<div style="color:#0066cc">🔵 주의: <strong>' + stats.caution + '</strong></div>' +
+    '<div style="color:#059669">🟢 양호: <strong>' + stats.good + '</strong></div>' +
+    (stats.unknown ? '<div style="color:#7a7a7a">⚪ 미분류: <strong>' + stats.unknown + '</strong></div>' : '');
+  if (zoom >= 10 && regionKeys.length > 1) {
+    var sidoStats = {};
+    for (var si = 0; si < candidates.length; si++) {
+      var sd = candidates[si];
+      if (!sidoStats[sd.sido]) sidoStats[sd.sido] = { danger:0, schools:new Set() };
+      sidoStats[sd.sido].schools.add(sd.school);
+      if (sd.gradeInfo.key === 'danger' || sd.gradeInfo.key === 'warning') sidoStats[sd.sido].danger++;
+    }
+    var sidoArr = Object.keys(sidoStats).sort(function(a,b){ return sidoStats[b].danger-sidoStats[a].danger; });
+    h += '<div style="border-top:1px solid #eee;margin-top:6px;padding-top:6px;font-size:10px;">';
+    sidoArr.slice(0,8).forEach(function(s) {
+      var st = sidoStats[s];
+      h += '<div style="display:flex;justify-content:space-between;"><span>'+s+' '+st.schools.size+'교</span><span style="color:'+(st.danger>0?'#dc2626':'#059669')+';font-weight:600;">위험 '+st.danger+'</span></div>';
+    });
+    h += '</div>';
+  }
+  el.innerHTML = h;
 }
 
 function mapApplyFilter() {
@@ -7743,68 +7820,7 @@ function mapUpdateStats() {
   mapUpdateStatsForViewport();
 }
 
-function mapUpdateStatsForViewport() {
-  if (!_mapObj) return;
-  var bounds = _mapObj.getBounds();
-  var sw = bounds.getSouthWest(), ne = bounds.getNorthEast();
-  var sLat = sw.getLat(), sLng = sw.getLng(), nLat = ne.getLat(), nLng = ne.getLng();
-
-  var stats = { danger: 0, warning: 0, caution: 0, good: 0, unknown: 0 };
-  var schools = new Set();
-  var regionCounts = {};
-  var visible = 0;
-
-  _mapData.forEach(function(d) {
-    if (!d.lat || !d.lng) return;
-    if (d.lat < sLat || d.lat > nLat || d.lng < sLng || d.lng > nLng) return;
-    visible++;
-    stats[d.gradeInfo.key] = (stats[d.gradeInfo.key] || 0) + 1;
-    schools.add(d.school);
-    var sgg = d.sido + ' ' + mapParseSigungu(d.address);
-    regionCounts[sgg] = (regionCounts[sgg] || 0) + 1;
-  });
-
-  // 가장 많은 지역 = 현재 보고 있는 지역
-  var topRegion = '';
-  var topCount = 0;
-  for (var r in regionCounts) {
-    if (regionCounts[r] > topCount) { topCount = regionCounts[r]; topRegion = r; }
-  }
-  var regionKeys = Object.keys(regionCounts);
-  var regionLabel = regionKeys.length <= 3 ? regionKeys.join(', ') : topRegion + ' 외 ' + (regionKeys.length - 1) + '개 지역';
-
-  var el = document.getElementById('mapStatsContent');
-  var h = '<div style="font-size:12px;font-weight:700;margin-bottom:4px;color:#1d1d1f;">' + regionLabel + '</div>' +
-    '<div>학교: <strong>' + schools.size + '교</strong> (' + visible + '동)</div>' +
-    '<div style="color:#dc2626">🔴 위험: <strong>' + stats.danger + '</strong></div>' +
-    '<div style="color:#d97706">🟠 경계: <strong>' + stats.warning + '</strong></div>' +
-    '<div style="color:#0066cc">🔵 주의: <strong>' + stats.caution + '</strong></div>' +
-    '<div style="color:#059669">🟢 양호: <strong>' + stats.good + '</strong></div>' +
-    (stats.unknown ? '<div style="color:#7a7a7a">⚪ 미분류: <strong>' + stats.unknown + '</strong></div>' : '');
-
-  // 축소 시 (zoom >= 10) 시도별 요약 추가
-  var zoom = _mapObj.getLevel();
-  if (zoom >= 10 && regionKeys.length > 1) {
-    var sidoStats = {};
-    _mapData.forEach(function(d) {
-      if (!d.lat || !d.lng) return;
-      if (d.lat < sLat || d.lat > nLat || d.lng < sLng || d.lng > nLng) return;
-      if (!sidoStats[d.sido]) sidoStats[d.sido] = { total: 0, danger: 0, schools: new Set() };
-      sidoStats[d.sido].total++;
-      sidoStats[d.sido].schools.add(d.school);
-      if (d.gradeInfo.key === 'danger' || d.gradeInfo.key === 'warning') sidoStats[d.sido].danger++;
-    });
-    var sidoArr = Object.keys(sidoStats).sort(function(a,b){ return sidoStats[b].danger - sidoStats[a].danger; });
-    h += '<div style="border-top:1px solid #eee;margin-top:6px;padding-top:6px;font-size:10px;">';
-    sidoArr.slice(0, 8).forEach(function(s) {
-      var st = sidoStats[s];
-      var clr = st.danger > 0 ? '#dc2626' : '#059669';
-      h += '<div style="display:flex;justify-content:space-between;"><span>' + s + ' ' + st.schools.size + '교</span><span style="color:'+clr+';font-weight:600;">위험 ' + st.danger + '</span></div>';
-    });
-    h += '</div>';
-  }
-  el.innerHTML = h;
-}
+// mapUpdateStatsForViewport는 mapUpdateStatsFromCandidates로 대체됨
 
 function mapSwitchSub(view) {
   var mapView = document.getElementById('mapSubView-map');
@@ -8115,10 +8131,20 @@ function mapSetScoreMode(mode) {
     var maxScore = mode === 'both' ? 10 : 5;
     d.gradeInfo = mapGetGradeByMode(score, maxScore);
   });
-  // 마커 이미지 갱신 (풀 초기화)
-  _markerPool = {};
-  _currentVisibleIds = new Set();
-  mapApplyFilter();
+  // 기존 마커 이미지만 교체 (풀 유지, 재생성 안 함)
+  for (var pid in _markerPool) {
+    var pm = _markerPool[pid];
+    if (pm && pm._data) {
+      pm.setImage(_markerImages[pm._data.gradeInfo.key] || _markerImages.unknown);
+    }
+  }
+  // 클러스터러 재구성 (색상 반영)
+  if (_mapClusterer) {
+    _mapClusterer.clear();
+    var reMarkers = [];
+    _currentVisibleIds.forEach(function(id) { if (_markerPool[id]) reMarkers.push(_markerPool[id]); });
+    _mapClusterer.addMarkers(reMarkers);
+  }
   mapBuildSidoFilters();
   mapUpdateStats();
   if (document.getElementById('mapSubView-region').style.display !== 'none') mapRegionView('sido');
