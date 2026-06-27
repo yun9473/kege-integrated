@@ -7661,39 +7661,16 @@ function _doUpdateViewport() {
   if (!changed) { newIds.forEach(function(id) { if (!_currentVisibleIds.has(id)) changed = true; }); }
   if (!changed) { mapUpdateStatsFromCandidates(candidates, sLat, sLng, nLat, nLng, zoom); return; }
 
-  // diff: 제거할 마커
-  var removeList = [];
-  _currentVisibleIds.forEach(function(id) {
-    if (!newIds.has(id)) removeList.push(id);
-  });
-  // diff: 추가할 마커
-  var addList = [];
-  newIds.forEach(function(id) {
-    if (!_currentVisibleIds.has(id)) addList.push(id);
-  });
-
-  // 개별 제거/추가 (clear+addMarkers 안 함)
-  if (_mapClusterer) {
-    // 제거
-    for (var ri = 0; ri < removeList.length; ri++) {
-      var rm = _markerPool[removeList[ri]];
-      if (rm) _mapClusterer.removeMarker(rm);
-    }
-    // 추가
-    var addMarkers = [];
-    for (var ai = 0; ai < addList.length; ai++) {
-      var ad = _mapData[addList[ai]];
-      if (!ad) continue;
-      var am = _markerPool[addList[ai]];
-      if (!am) { am = mapCreateMarker(ad); _markerPool[addList[ai]] = am; }
-      addMarkers.push(am);
-    }
-    if (addMarkers.length > 0) _mapClusterer.addMarkers(addMarkers);
-  }
-
-  // _mapMarkers 갱신
+  // 클러스터러 갱신 — clear + addMarkers (안정적)
+  if (_mapClusterer) _mapClusterer.clear();
   _mapMarkers = [];
-  newIds.forEach(function(id) { if (_markerPool[id]) _mapMarkers.push(_markerPool[id]); });
+  for (var ci = 0; ci < candidates.length; ci++) {
+    var cd = candidates[ci];
+    var cm = _markerPool[cd.id];
+    if (!cm) { cm = mapCreateMarker(cd); _markerPool[cd.id] = cm; }
+    _mapMarkers.push(cm);
+  }
+  if (_mapClusterer && _mapMarkers.length > 0) _mapClusterer.addMarkers(_mapMarkers);
   _currentVisibleIds = newIds;
   mapUpdateStatsFromCandidates(candidates, sLat, sLng, nLat, nLng, zoom);
 }
