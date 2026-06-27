@@ -363,6 +363,9 @@ body{font-family:'Pretendard',system-ui,-apple-system,'Apple SD Gothic Neo',sans
   .m-key,.m-val{font-size:10px}
 
   /* ── 연구 진행 ── */
+  #module-research>div{padding:24px 16px 32px !important}
+  #module-research>div>div:first-child{margin-bottom:16px !important}
+  #module-research>div>div:first-child div[style*="font-size:40px"]{font-size:24px !important}
   .research-subtabs{overflow-x:auto;-webkit-overflow-scrolling:touch}
   .research-subtabs .tab{white-space:nowrap;flex-shrink:0}
 
@@ -2418,6 +2421,8 @@ function switchModule(mod, el) {
   document.querySelectorAll('.module-panel').forEach(function(p){ p.classList.remove('active'); });
   document.getElementById('module-' + mod).classList.add('active');
   window.scrollTo(0,0);
+  document.querySelectorAll('.body-wrap').forEach(function(bw){bw.scrollTop=0;});
+  document.querySelectorAll('.main').forEach(function(m){m.scrollTop=0;});
   if (mod === 'dashboard') {
     setTimeout(function(){ window.dispatchEvent(new Event('resize')); }, 150);
   }
