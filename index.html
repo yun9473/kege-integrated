@@ -440,6 +440,9 @@ body{font-family:'Pretendard',system-ui,-apple-system,'Apple SD Gothic Neo',sans
 .map-sido-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:9999px;font-size:11px;cursor:pointer;border:1px solid #e0e0e0;background:#fff;color:#333;transition:.12s;}
 .map-sido-chip.active{background:var(--blue);color:#fff;border-color:var(--blue);}
 .map-sido-chip:hover:not(.active){background:#f0f5ff;}
+.map-score-btn{flex:1;padding:6px 4px;font-size:10px;font-weight:600;border:none;cursor:pointer;background:#fff;color:#666;font-family:inherit;transition:.12s;}
+.map-score-btn.active{background:#1d1d1f;color:#fff;}
+.map-score-btn:hover:not(.active){background:#f0f5ff;}
 .map-subtab{padding:10px 18px;font-size:13px;font-weight:600;color:#7a7a7a;cursor:pointer;border:none;background:none;border-bottom:3px solid transparent;font-family:inherit;transition:.15s;}
 .map-subtab.active{color:#1d1d1f;border-bottom-color:#0066cc;}
 .map-subtab:hover:not(.active){color:#0066cc;}
@@ -2046,14 +2049,26 @@ table.dtable tbody tr{cursor:pointer;}
     <!-- 왼쪽 필터 패널 -->
     <div id="mapFilterPanel" style="width:240px;background:#fafafa;border-right:1px solid #e0e0e0;overflow-y:auto;padding:16px;flex-shrink:0;">
 
+      <!-- 점수 모드 -->
+      <div style="margin-bottom:18px;">
+        <div style="font-size:11px;font-weight:700;color:var(--gray);margin-bottom:8px;text-transform:uppercase;">점수 기준</div>
+        <div style="display:flex;gap:0;border-radius:8px;overflow:hidden;border:1px solid #e0e0e0;">
+          <button id="mapScoreMode-both" class="map-score-btn active" onclick="mapSetScoreMode('both')">종합 (10점)</button>
+          <button id="mapScoreMode-safety" class="map-score-btn" onclick="mapSetScoreMode('safety')">안전등급 (5점)</button>
+          <button id="mapScoreMode-age" class="map-score-btn" onclick="mapSetScoreMode('age')">경과연수 (5점)</button>
+        </div>
+      </div>
+
       <!-- 위험도 등급 필터 -->
       <div style="margin-bottom:18px;">
         <div style="font-size:11px;font-weight:700;color:var(--gray);margin-bottom:8px;text-transform:uppercase;">위험도 등급</div>
-        <label class="map-filter-item" style="--fc:#dc2626"><input type="checkbox" checked onchange="mapApplyFilter()" data-grade="danger"><span class="map-dot" style="background:#dc2626"></span> 위험 (7~10)</label>
-        <label class="map-filter-item" style="--fc:#d97706"><input type="checkbox" checked onchange="mapApplyFilter()" data-grade="warning"><span class="map-dot" style="background:#d97706"></span> 경계 (5~6)</label>
-        <label class="map-filter-item" style="--fc:#0066cc"><input type="checkbox" checked onchange="mapApplyFilter()" data-grade="caution"><span class="map-dot" style="background:#0066cc"></span> 주의 (3~4)</label>
-        <label class="map-filter-item" style="--fc:#059669"><input type="checkbox" checked onchange="mapApplyFilter()" data-grade="good"><span class="map-dot" style="background:#059669"></span> 양호 (0~2)</label>
-        <label class="map-filter-item" style="--fc:#7a7a7a"><input type="checkbox" checked onchange="mapApplyFilter()" data-grade="unknown"><span class="map-dot" style="background:#7a7a7a"></span> 미분류</label>
+        <div id="mapGradeFilterLabels">
+          <label class="map-filter-item" style="--fc:#dc2626"><input type="checkbox" checked onchange="mapApplyFilter()" data-grade="danger"><span class="map-dot" style="background:#dc2626"></span> <span class="map-grade-label">위험 (7~10)</span></label>
+          <label class="map-filter-item" style="--fc:#d97706"><input type="checkbox" checked onchange="mapApplyFilter()" data-grade="warning"><span class="map-dot" style="background:#d97706"></span> <span class="map-grade-label">경계 (5~6)</span></label>
+          <label class="map-filter-item" style="--fc:#0066cc"><input type="checkbox" checked onchange="mapApplyFilter()" data-grade="caution"><span class="map-dot" style="background:#0066cc"></span> <span class="map-grade-label">주의 (3~4)</span></label>
+          <label class="map-filter-item" style="--fc:#059669"><input type="checkbox" checked onchange="mapApplyFilter()" data-grade="good"><span class="map-dot" style="background:#059669"></span> <span class="map-grade-label">양호 (0~2)</span></label>
+          <label class="map-filter-item" style="--fc:#7a7a7a"><input type="checkbox" checked onchange="mapApplyFilter()" data-grade="unknown"><span class="map-dot" style="background:#7a7a7a"></span> 미분류</label>
+        </div>
       </div>
 
       <!-- 시도별 필터 (아코디언) -->
@@ -8070,6 +8085,57 @@ function mapShowSchoolDetail(id) {
     renderSigunguView(container, d.sido);
     return false;
   };
+}
+
+var _mapScoreMode = 'both'; // 'both', 'safety', 'age'
+
+function mapSetScoreMode(mode) {
+  _mapScoreMode = mode;
+  ['both','safety','age'].forEach(function(m) {
+    var btn = document.getElementById('mapScoreMode-' + m);
+    if (btn) btn.classList.toggle('active', m === mode);
+  });
+  // 라벨 업데이트
+  var labels = document.querySelectorAll('.map-grade-label');
+  if (mode === 'both') {
+    if (labels[0]) labels[0].textContent = '위험 (7~10)';
+    if (labels[1]) labels[1].textContent = '경계 (5~6)';
+    if (labels[2]) labels[2].textContent = '주의 (3~4)';
+    if (labels[3]) labels[3].textContent = '양호 (0~2)';
+  } else {
+    if (labels[0]) labels[0].textContent = '위험 (5)';
+    if (labels[1]) labels[1].textContent = '경계 (4)';
+    if (labels[2]) labels[2].textContent = '주의 (3)';
+    if (labels[3]) labels[3].textContent = '양호 (1~2)';
+  }
+  // 위험도 재계산
+  _mapData.forEach(function(d) {
+    if (!d.risk) return;
+    var score = mode === 'safety' ? d.risk.safety : mode === 'age' ? d.risk.age : d.risk.total;
+    var maxScore = mode === 'both' ? 10 : 5;
+    d.gradeInfo = mapGetGradeByMode(score, maxScore);
+  });
+  // 마커 이미지 갱신 (풀 초기화)
+  _markerPool = {};
+  _currentVisibleIds = new Set();
+  mapApplyFilter();
+  mapBuildSidoFilters();
+  mapUpdateStats();
+  if (document.getElementById('mapSubView-region').style.display !== 'none') mapRegionView('sido');
+}
+
+function mapGetGradeByMode(score, maxScore) {
+  if (maxScore === 5) {
+    if (score >= 5) return { label: '위험', color: '#dc2626', key: 'danger' };
+    if (score >= 4) return { label: '경계', color: '#d97706', key: 'warning' };
+    if (score >= 3) return { label: '주의', color: '#0066cc', key: 'caution' };
+    return { label: '양호', color: '#059669', key: 'good' };
+  }
+  // 10점 기준
+  if (score >= 7) return { label: '위험', color: '#dc2626', key: 'danger' };
+  if (score >= 5) return { label: '경계', color: '#d97706', key: 'warning' };
+  if (score >= 3) return { label: '주의', color: '#0066cc', key: 'caution' };
+  return { label: '양호', color: '#059669', key: 'good' };
 }
 
 function mapSetType(type) {
