@@ -7636,6 +7636,7 @@ function _doUpdateViewport() {
 
   if (_mapClusterer) _mapClusterer.addMarkers(_mapMarkers);
   _currentVisibleIds = newIds;
+  mapUpdateStatsForViewport();
 }
 
 function mapApplyFilter() {
@@ -7718,23 +7719,49 @@ function mapBuildSidoFilters() {
 }
 
 function mapUpdateStats() {
-  var stats = { total: 0, danger: 0, warning: 0, caution: 0, good: 0, unknown: 0 };
-  var schoolSet = new Set();
+  document.getElementById('mapStatsOverlay').style.display = 'block';
+  mapUpdateStatsForViewport();
+}
+
+function mapUpdateStatsForViewport() {
+  if (!_mapObj) return;
+  var bounds = _mapObj.getBounds();
+  var sw = bounds.getSouthWest(), ne = bounds.getNorthEast();
+  var sLat = sw.getLat(), sLng = sw.getLng(), nLat = ne.getLat(), nLng = ne.getLng();
+
+  var stats = { danger: 0, warning: 0, caution: 0, good: 0, unknown: 0 };
+  var schools = new Set();
+  var regionCounts = {};
+  var visible = 0;
+
   _mapData.forEach(function(d) {
+    if (!d.lat || !d.lng) return;
+    if (d.lat < sLat || d.lat > nLat || d.lng < sLng || d.lng > nLng) return;
+    visible++;
     stats[d.gradeInfo.key] = (stats[d.gradeInfo.key] || 0) + 1;
-    schoolSet.add(d.school);
+    schools.add(d.school);
+    var sgg = d.sido + ' ' + mapParseSigungu(d.address);
+    regionCounts[sgg] = (regionCounts[sgg] || 0) + 1;
   });
-  stats.total = _mapData.length;
-  var schoolCount = schoolSet.size;
+
+  // 가장 많은 지역 = 현재 보고 있는 지역
+  var topRegion = '';
+  var topCount = 0;
+  for (var r in regionCounts) {
+    if (regionCounts[r] > topCount) { topCount = regionCounts[r]; topRegion = r; }
+  }
+  var regionKeys = Object.keys(regionCounts);
+  var regionLabel = regionKeys.length <= 3 ? regionKeys.join(', ') : topRegion + ' 외 ' + (regionKeys.length - 1) + '개 지역';
+
   var el = document.getElementById('mapStatsContent');
   el.innerHTML =
-    '<div>총 학교: <strong>' + schoolCount + '교</strong> (' + stats.total + '동)</div>' +
-    '<div style="color:#dc2626">🔴 위험: <strong>' + stats.danger + '동</strong></div>' +
-    '<div style="color:#d97706">🟠 경계: <strong>' + stats.warning + '동</strong></div>' +
-    '<div style="color:#0066cc">🔵 주의: <strong>' + stats.caution + '동</strong></div>' +
-    '<div style="color:#059669">🟢 양호: <strong>' + stats.good + '동</strong></div>' +
-    '<div style="color:#7a7a7a">⚪ 미분류: <strong>' + stats.unknown + '동</strong></div>';
-  document.getElementById('mapStatsOverlay').style.display = 'block';
+    '<div style="font-size:12px;font-weight:700;margin-bottom:4px;color:#1d1d1f;">' + regionLabel + '</div>' +
+    '<div>학교: <strong>' + schools.size + '교</strong> (' + visible + '동)</div>' +
+    '<div style="color:#dc2626">🔴 위험: <strong>' + stats.danger + '</strong></div>' +
+    '<div style="color:#d97706">🟠 경계: <strong>' + stats.warning + '</strong></div>' +
+    '<div style="color:#0066cc">🔵 주의: <strong>' + stats.caution + '</strong></div>' +
+    '<div style="color:#059669">🟢 양호: <strong>' + stats.good + '</strong></div>' +
+    (stats.unknown ? '<div style="color:#7a7a7a">⚪ 미분류: <strong>' + stats.unknown + '</strong></div>' : '');
 }
 
 function mapSwitchSub(view) {
