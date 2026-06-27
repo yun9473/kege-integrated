@@ -1042,6 +1042,82 @@ table.dtable tbody tr{cursor:pointer;}
           </div>
         </div>
 
+        <!-- ═══ 알림 이메일 관리 ═══ -->
+        <div class="card">
+          <div class="card-title"> 알림 이메일 관리
+            <button class="btn btn-o btn-sm" style="margin-left:auto" onclick="emailExportExcel()">Excel 내보내기</button>
+          </div>
+
+          <!-- D-Day 및 알림 시점 -->
+          <div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px;padding:14px;background:var(--gray-l);border-radius:12px;">
+            <div class="fg" style="margin-bottom:0;min-width:160px">
+              <label class="fl">제출 마감일 (D-Day)</label>
+              <input class="fi" id="email-dday" type="date" onchange="emailUpdatePreview()"/>
+            </div>
+            <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+              <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="email-d7" checked> D-7</label>
+              <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="email-d3" checked> D-3</label>
+              <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="email-d1" checked> D-1</label>
+            </div>
+            <div id="email-dday-preview" style="font-size:11px;color:var(--gray);"></div>
+          </div>
+
+          <!-- 이메일 내용 템플릿 -->
+          <div style="margin-bottom:16px;">
+            <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;">이메일 제목</div>
+            <input class="fi" id="email-subject" value="[교육환경센터] 기초자료 제출 안내 (D-{day})" placeholder="제목 입력 ({day}=남은일수, {school}=학교명, {deadline}=마감일)"/>
+            <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;margin-top:12px;">이메일 본문</div>
+            <textarea class="fi" id="email-body" rows="8" style="resize:vertical;font-size:13px;line-height:1.7;">안녕하세요, 한국교육녹색환경연구원 교육환경센터입니다.
+
+{school} 담당자님께 기초자료 제출 마감을 안내드립니다.
+
+■ 제출 마감일: {deadline}
+■ 남은 기간: D-{day}
+■ 제출 방법: 공간재구조화 연구 시스템 접속 → 파일 업로드
+■ 시스템 주소: https://kege-integrated.vercel.app
+
+미제출 항목이 있을 경우, 마감일까지 제출 부탁드립니다.
+문의사항은 KEGE_1HQ@kege.or.kr 로 연락해주시기 바랍니다.
+
+감사합니다.
+한국교육녹색환경연구원 교육환경센터</textarea>
+            <div style="font-size:10px;color:var(--gray);margin-top:4px;">변수: {school}=학교명, {deadline}=마감일, {day}=남은일수, {building}=건물동명</div>
+          </div>
+
+          <!-- 학교별 이메일 테이블 -->
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <div style="font-size:12px;font-weight:600;color:var(--text2);">학교별 담당자 이메일</div>
+            <label class="btn btn-o btn-sm" style="margin-left:auto;cursor:pointer;">
+              Excel 일괄 등록
+              <input type="file" accept=".xlsx,.xls" style="display:none" onchange="emailBulkUpload(this)"/>
+            </label>
+            <button class="btn btn-p btn-sm" onclick="emailSaveAll()">전체 저장</button>
+          </div>
+          <div style="overflow-x:auto;max-height:400px;overflow-y:auto;border:1px solid #e0e0e0;border-radius:10px;">
+            <table class="ctbl" id="email-tbl">
+              <thead style="position:sticky;top:0;z-index:1;">
+                <tr><th style="width:40px">순번</th><th>학교명</th><th>건물동명</th><th style="width:220px">담당자 이메일</th><th style="width:60px">선택</th></tr>
+              </thead>
+              <tbody id="email-tbl-body"></tbody>
+            </table>
+          </div>
+
+          <!-- 발송 버튼 -->
+          <div style="margin-top:16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <button class="btn btn-p" onclick="emailPreviewSend()">발송 미리보기</button>
+            <span id="email-send-status" style="font-size:12px;color:var(--gray);"></span>
+          </div>
+
+          <!-- 발송 이력 로그 -->
+          <div style="margin-top:20px;">
+            <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px;">발송 이력</div>
+            <div id="email-log" style="max-height:200px;overflow-y:auto;background:#1d1d1f;border-radius:10px;padding:12px;font-family:'SF Mono',Menlo,monospace;font-size:11px;color:#a0a0a0;">
+              <div style="color:#555;">발송 이력이 없습니다.</div>
+            </div>
+          </div>
+        </div>
+        <!-- ═══ end 알림 이메일 관리 ═══ -->
+
         <div class="card" style="background:var(--red-l);border:1px solid #fca5a5">
           <div class="card-title"> 체크리스트 초기화</div>
           <div style="font-size:13px;color:var(--text2);margin-bottom:10px">저장된 수신 현황을 초기화합니다. SharePoint 파일은 유지됩니다.</div>
@@ -4140,6 +4216,189 @@ function confirmReset(){
   };
   document.getElementById('mbg').classList.add('open');
 }
+// ═══ 알림 이메일 관리 JS ═══
+function emailGetData(){
+  var d = JSON.parse(localStorage.getItem('emailData_'+(currentProject?.id||'default'))||'{}');
+  return d;
+}
+function emailSaveData(data){
+  localStorage.setItem('emailData_'+(currentProject?.id||'default'), JSON.stringify(data));
+}
+
+function emailBuildTable(){
+  var tbody = document.getElementById('email-tbl-body');
+  if(!tbody) return;
+  var data = emailGetData();
+  var emails = data.emails || {};
+  tbody.innerHTML = SCHOOLS.map(function(s,i){
+    var em = emails[s.id] || '';
+    return '<tr>'+
+      '<td>'+(i+1)+'</td>'+
+      '<td style="font-weight:600">'+s.school+'</td>'+
+      '<td>'+s.building+'</td>'+
+      '<td><input class="fi email-input" data-sid="'+s.id+'" value="'+em+'" placeholder="email@example.com" style="padding:8px 10px;font-size:13px;"/></td>'+
+      '<td style="text-align:center"><input type="checkbox" class="email-check" data-sid="'+s.id+'" checked></td>'+
+    '</tr>';
+  }).join('');
+  // D-Day 복원
+  var dday = document.getElementById('email-dday');
+  if(dday && data.dday) dday.value = data.dday;
+  if(data.d7===false) document.getElementById('email-d7').checked=false;
+  if(data.d3===false) document.getElementById('email-d3').checked=false;
+  if(data.d1===false) document.getElementById('email-d1').checked=false;
+  emailUpdatePreview();
+}
+
+function emailSaveAll(){
+  var data = emailGetData();
+  data.emails = {};
+  document.querySelectorAll('.email-input').forEach(function(inp){
+    var v = inp.value.trim();
+    if(v) data.emails[inp.dataset.sid] = v;
+  });
+  data.dday = document.getElementById('email-dday').value;
+  data.d7 = document.getElementById('email-d7').checked;
+  data.d3 = document.getElementById('email-d3').checked;
+  data.d1 = document.getElementById('email-d1').checked;
+  data.subject = document.getElementById('email-subject').value;
+  data.body = document.getElementById('email-body').value;
+  emailSaveData(data);
+  toast('이메일 설정 저장됨','success');
+}
+
+function emailUpdatePreview(){
+  var dday = document.getElementById('email-dday').value;
+  var el = document.getElementById('email-dday-preview');
+  if(!dday || !el) return;
+  var d = calcDday(dday);
+  var checks = [];
+  if(document.getElementById('email-d7').checked) checks.push('D-7 ('+ new Date(new Date(dday).getTime()-7*86400000).toISOString().slice(0,10) +')');
+  if(document.getElementById('email-d3').checked) checks.push('D-3 ('+ new Date(new Date(dday).getTime()-3*86400000).toISOString().slice(0,10) +')');
+  if(document.getElementById('email-d1').checked) checks.push('D-1 ('+ new Date(new Date(dday).getTime()-1*86400000).toISOString().slice(0,10) +')');
+  el.innerHTML = '마감 D'+(d>0?'-'+d:d===0?'-Day':'+'+Math.abs(d))+' · 알림: '+(checks.length?checks.join(', '):'없음');
+}
+
+function emailBulkUpload(input){
+  var f = input.files[0]; if(!f) return;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var wb = XLSX.read(e.target.result,{type:'array'});
+    var ws = wb.Sheets[wb.SheetNames[0]];
+    var rows = XLSX.utils.sheet_to_json(ws,{defval:''});
+    var data = emailGetData();
+    if(!data.emails) data.emails={};
+    var cnt=0;
+    rows.forEach(function(r){
+      var school = r['학교명']||r['school']||'';
+      var email = r['이메일']||r['email']||r['Email']||'';
+      if(!school || !email) return;
+      SCHOOLS.forEach(function(s){
+        if(s.school===school.trim()){
+          data.emails[s.id]=email.trim();
+          cnt++;
+        }
+      });
+    });
+    emailSaveData(data);
+    emailBuildTable();
+    toast(cnt+'건 이메일 등록됨','success');
+  };
+  reader.readAsArrayBuffer(f);
+  input.value='';
+}
+
+function emailExportExcel(){
+  var data = emailGetData();
+  var emails = data.emails||{};
+  var rows = SCHOOLS.map(function(s){
+    return {'학교명':s.school,'건물동명':s.building,'이메일':emails[s.id]||''};
+  });
+  var ws = XLSX.utils.json_to_sheet(rows);
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'이메일목록');
+  XLSX.writeFile(wb,'알림이메일_'+(currentProject?.name||'목록')+'.xlsx');
+}
+
+function emailPreviewSend(){
+  var data = emailGetData();
+  var emails = data.emails||{};
+  var dday = document.getElementById('email-dday').value;
+  if(!dday){ toast('마감일을 설정해주세요','error'); return; }
+  var subject = document.getElementById('email-subject').value;
+  var body = document.getElementById('email-body').value;
+  var selected = [];
+  document.querySelectorAll('.email-check:checked').forEach(function(cb){
+    var sid = cb.dataset.sid;
+    if(emails[sid]) selected.push({sid:sid, email:emails[sid]});
+  });
+  if(selected.length===0){ toast('발송 대상이 없습니다 (이메일 입력 및 선택 확인)','error'); return; }
+
+  var d = calcDday(dday);
+  var deadlineStr = dday;
+  var preview = selected.slice(0,5).map(function(item){
+    var s = SCHOOLS.find(function(x){return x.id===item.sid;});
+    var subj = subject.replace(/\{day\}/g,Math.abs(d)).replace(/\{school\}/g,s?s.school:'').replace(/\{deadline\}/g,deadlineStr);
+    return '<div style="padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:12px;"><strong>'+item.email+'</strong> — '+subj+'</div>';
+  }).join('');
+  if(selected.length>5) preview+='<div style="font-size:11px;color:#999;padding:4px 0;">외 '+(selected.length-5)+'건...</div>';
+
+  document.getElementById('m-title').textContent='이메일 발송 확인';
+  document.getElementById('m-body').innerHTML='<div style="margin-bottom:10px;font-size:13px;color:#333;">총 <strong>'+selected.length+'건</strong> 발송 예정</div>'+preview+
+    '<div style="margin-top:12px;padding:10px;background:#f5f5f7;border-radius:8px;font-size:11px;color:#555;">Power Automate HTTP 트리거를 통해 발송됩니다.</div>';
+  document.getElementById('m-ok').textContent='발송';
+  document.getElementById('m-ok').onclick=function(){ closeModal(); emailDoSend(selected,subject,body,dday); };
+  document.getElementById('mbg').classList.add('open');
+}
+
+async function emailDoSend(targets,subject,body,dday){
+  var paUrl = getCfg().paUrl;
+  if(!paUrl){ toast('Power Automate URL이 설정되지 않았습니다','error'); return; }
+  var d = calcDday(dday);
+  var deadlineStr = dday;
+  var logEl = document.getElementById('email-log');
+  var statusEl = document.getElementById('email-send-status');
+  statusEl.textContent = '발송 중... 0/'+targets.length;
+  var sent=0, fail=0;
+
+  for(var i=0;i<targets.length;i++){
+    var item=targets[i];
+    var s=SCHOOLS.find(function(x){return x.id===item.sid;});
+    var subj=subject.replace(/\{day\}/g,Math.abs(d)).replace(/\{school\}/g,s?s.school:'').replace(/\{deadline\}/g,deadlineStr).replace(/\{building\}/g,s?s.building:'');
+    var bd=body.replace(/\{day\}/g,Math.abs(d)).replace(/\{school\}/g,s?s.school:'').replace(/\{deadline\}/g,deadlineStr).replace(/\{building\}/g,s?s.building:'');
+
+    try{
+      await fetch(paUrl,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({action:'sendEmail',to:item.email,subject:subj,body:bd,school:s?s.school:''})
+      });
+      sent++;
+      var now=new Date().toLocaleTimeString('ko-KR');
+      logEl.innerHTML='<div style="color:#059669;">✅ ['+now+'] '+item.email+' → '+(s?s.school:'')+' 발송 완료</div>'+logEl.innerHTML;
+    }catch(e){
+      fail++;
+      var now2=new Date().toLocaleTimeString('ko-KR');
+      logEl.innerHTML='<div style="color:#dc2626;">❌ ['+now2+'] '+item.email+' 발송 실패: '+e.message+'</div>'+logEl.innerHTML;
+    }
+    statusEl.textContent='발송 중... '+(i+1)+'/'+targets.length;
+  }
+  statusEl.textContent='완료: 성공 '+sent+'건, 실패 '+fail+'건';
+  // 이력 저장
+  var data=emailGetData();
+  if(!data.log) data.log=[];
+  data.log.unshift({date:new Date().toISOString(),sent:sent,fail:fail,total:targets.length});
+  if(data.log.length>50) data.log=data.log.slice(0,50);
+  emailSaveData(data);
+}
+
+// buildCodeTable 호출 시 이메일 테이블도 같이 빌드
+var _origBuildCodeTable = buildCodeTable;
+buildCodeTable = function(){
+  _origBuildCodeTable();
+  emailBuildTable();
+};
+// ═══ end 알림 이메일 관리 JS ═══
+
 function closeModal(){
   document.getElementById('mbg').classList.remove('open');
   // 취소 버튼 원복 (학교현황 모달에서 숨겼을 수 있음)
