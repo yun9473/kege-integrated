@@ -4739,19 +4739,17 @@ function countUp(el,target,dec,ms){
 
 // ── 탭 전환 (4탭) ──
 function switchTab(id,el){
-  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('#module-dashboard .tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('#module-dashboard .tab-bar .tab').forEach(t=>t.classList.remove('active'));
   var newId = id==='compare'?'analysis':id==='trend'?'analysis':id==='detail'?'search':id==='metrics'?'analysis':id==='predict'?'predict':id;
   document.getElementById('tab-'+newId).classList.add('active');
   // tab bar el 처리
-  if(el){
-    var targetId=newId;
-    document.querySelectorAll('.tab').forEach(t=>{
-      var oc=t.getAttribute('onclick')||'';
-      if(oc.includes("'"+targetId+"'")) t.classList.add('active');
-    });
-    el.classList.add('active');
-  }
+  var targetId=newId;
+  document.querySelectorAll('#module-dashboard .tab-bar .tab').forEach(t=>{
+    var oc=t.getAttribute('onclick')||'';
+    if(oc.includes("'"+targetId+"'")) t.classList.add('active');
+  });
+  if(el) el.classList.add('active');
   if(newId==='search') renderDetailTable('all');
   if(newId==='map'){ setTimeout(function(){ mapInitKakao().then(function(){ if(_mapObj) _mapObj.relayout(); }); },200); }
   if(newId==='edu'&&!_eduInitDone){
