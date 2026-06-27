@@ -4674,7 +4674,7 @@ function switchTab(id,el){
     el.classList.add('active');
   }
   if(newId==='search') renderDetailTable('all');
-  if(newId==='map'){ setTimeout(function(){ mapInitKakao(); if(_mapObj) _mapObj.relayout(); },200); }
+  if(newId==='map'){ setTimeout(function(){ mapInitKakao().then(function(){ if(_mapObj) _mapObj.relayout(); }); },200); }
   if(newId==='edu'&&!_eduInitDone){
     var firstChip=document.querySelector('.edu-chip');
     if(firstChip) firstChip.click();
@@ -7189,35 +7189,52 @@ var _mapObj = null;
 var _mapInited = false;
 var _mapGeoCache = {};
 
+var _mapInitPromise = null;
 function mapInitKakao() {
-  if (_mapInited) return;
-  try {
-    if (typeof kakao === 'undefined' || !kakao.maps) {
-      // SDK 아직 로드 안 됨 — 1초 후 재시도
-      setTimeout(mapInitKakao, 1000);
-      return;
+  if (_mapInitPromise) return _mapInitPromise;
+  _mapInitPromise = new Promise(function(resolve) {
+    function tryInit() {
+      console.log('mapInitKakao tryInit: kakao=' + (typeof kakao !== 'undefined') + ', _mapInited=' + _mapInited);
+      if (_mapInited && _mapObj && _mapClusterer) {
+        console.log('mapInitKakao: already initialized');
+        resolve(); return;
+      }
+      if (typeof kakao === 'undefined' || !kakao.maps) {
+        console.log('mapInitKakao: SDK not loaded, retry in 500ms');
+        setTimeout(tryInit, 500);
+        return;
+      }
+      try {
+        kakao.maps.load(function() {
+          console.log('mapInitKakao: kakao.maps.load callback');
+          var container = document.getElementById('mapContainer');
+          if (!container) { console.error('mapInitKakao: #mapContainer not found'); resolve(); return; }
+          _mapObj = new kakao.maps.Map(container, {
+            center: new kakao.maps.LatLng(36.5, 127.5),
+            level: 12
+          });
+          _mapClusterer = new kakao.maps.MarkerClusterer({
+            map: _mapObj, averageCenter: true, minLevel: 6,
+            calculator: [10, 30, 70],
+            styles: [
+              {width:'36px',height:'36px',background:'rgba(0,102,204,.7)',borderRadius:'50%',color:'#fff',textAlign:'center',lineHeight:'36px',fontSize:'12px',fontWeight:'700'},
+              {width:'44px',height:'44px',background:'rgba(217,119,6,.8)',borderRadius:'50%',color:'#fff',textAlign:'center',lineHeight:'44px',fontSize:'13px',fontWeight:'700'},
+              {width:'52px',height:'52px',background:'rgba(220,38,38,.85)',borderRadius:'50%',color:'#fff',textAlign:'center',lineHeight:'52px',fontSize:'14px',fontWeight:'700'}
+            ]
+          });
+          mapInitMarkerImages();
+          _mapInited = true;
+          console.log('mapInitKakao: COMPLETE, _mapObj=', !!_mapObj, '_mapClusterer=', !!_mapClusterer);
+          resolve();
+        });
+      } catch(e) {
+        console.error('mapInitKakao ERROR:', e);
+        resolve();
+      }
     }
-    kakao.maps.load(function() {
-      var container = document.getElementById('mapContainer');
-      _mapObj = new kakao.maps.Map(container, {
-        center: new kakao.maps.LatLng(36.5, 127.5),
-        level: 12
-      });
-      _mapClusterer = new kakao.maps.MarkerClusterer({
-        map: _mapObj, averageCenter: true, minLevel: 6,
-        calculator: [10, 30, 70],
-        styles: [
-          {width:'36px',height:'36px',background:'rgba(0,102,204,.7)',borderRadius:'50%',color:'#fff',textAlign:'center',lineHeight:'36px',fontSize:'12px',fontWeight:'700'},
-          {width:'44px',height:'44px',background:'rgba(217,119,6,.8)',borderRadius:'50%',color:'#fff',textAlign:'center',lineHeight:'44px',fontSize:'13px',fontWeight:'700'},
-          {width:'52px',height:'52px',background:'rgba(220,38,38,.85)',borderRadius:'50%',color:'#fff',textAlign:'center',lineHeight:'52px',fontSize:'14px',fontWeight:'700'}
-        ]
-      });
-      mapInitMarkerImages();
-      _mapInited = true;
-    });
-  } catch(e) {
-    console.warn('Kakao Map SDK 로드 실패:', e);
-  }
+    tryInit();
+  });
+  return _mapInitPromise;
 }
 
 function mapCalcRisk(grade, year) {
@@ -7325,18 +7342,12 @@ function mapLoadExcel(input) {
     document.getElementById('mapEmptyMsg').style.display = 'none';
     mapBuildSidoFilters();
     mapUpdateStats();
-    // 지도 초기화 보장 후 렌더링
-    function waitForMapAndRender() {
-      if (_mapObj) {
-        console.log('_mapObj ready, calling mapRenderMarkers');
-        mapRenderMarkers();
-      } else {
-        console.log('_mapObj not ready, calling mapInitKakao and retrying...');
-        mapInitKakao();
-        setTimeout(waitForMapAndRender, 500);
-      }
-    }
-    waitForMapAndRender();
+    // 지도 초기화 완료 후 렌더링
+    console.log('mapLoadExcel: calling mapInitKakao().then(mapRenderMarkers)');
+    mapInitKakao().then(function() {
+      console.log('mapInitKakao resolved, _mapObj=', !!_mapObj, '_mapClusterer=', !!_mapClusterer);
+      mapRenderMarkers();
+    });
   };
   reader.readAsArrayBuffer(f);
 }
