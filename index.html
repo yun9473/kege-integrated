@@ -2027,7 +2027,7 @@ table.dtable tbody tr{cursor:pointer;}
     <div style="margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
       <label class="map-upload-btn" style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;background:var(--blue);color:#fff;border-radius:9999px;font-size:12px;font-weight:600;cursor:pointer;">
         📂 엑셀 업로드
-        <input type="file" id="mapExcelFile" accept=".xlsx,.xls" style="display:none;" onchange="mapLoadExcel(this)"/>
+        <input type="file" id="mapExcelFile" accept=".xlsx,.xls,.csv" style="display:none;" onchange="mapLoadExcel(this)"/>
       </label>
       <button class="btn btn-o btn-sm" onclick="mapClearData()">초기화</button>
       <span id="mapDataCount" style="font-size:11px;color:var(--gray);"></span>
@@ -7256,32 +7256,51 @@ function mapLoadExcel(input) {
     var rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
 
     // 컬럼 자동 감지
-    var colMap = { school: null, address: null, grade: null, year: null, building: null, type: null };
+    var colMap = { school: null, address: null, grade: null, year: null, building: null, type: null, area: null };
     if (rows.length > 0) {
       var keys = Object.keys(rows[0]);
       keys.forEach(function(k) {
-        var kl = k.toLowerCase().replace(/\s/g,'');
-        if (kl.includes('학교') && !kl.includes('건물') && !kl.includes('동')) colMap.school = k;
-        if (kl.includes('주소') || kl.includes('소재지')) colMap.address = k;
-        if (kl.includes('안전') && kl.includes('등급')) colMap.grade = k;
-        if (kl.includes('준공') || kl.includes('설립연도') || kl.includes('건축연도')) colMap.year = k;
-        if (kl.includes('건물') || kl.includes('동명') || kl.includes('대상동')) colMap.building = k;
-        if (kl.includes('사업유형') || kl.includes('유형')) colMap.type = k;
+        var kl = k.replace(/\s/g,'');
+        if (kl === '학교명') colMap.school = k;
+        if (kl.includes('주소') || kl.includes('소재지') || kl === '도로명주소') colMap.address = k;
+        if (kl === '안전등급') colMap.grade = k;
+        if (kl === '안전등급_건물명') colMap.building = k;
+        if (kl === '준공연도' || kl === '설립연도' || kl === '건축연도') colMap.year = k;
+        if (kl === '사업유형' || kl === '유형') colMap.type = k;
+        if (kl === '연면적') colMap.area = k;
+        if (!colMap.building && (kl.includes('건물') || kl.includes('동명') || kl.includes('대상동'))) colMap.building = k;
+        if (!colMap.school && kl.includes('학교')) colMap.school = k;
       });
     }
 
     _mapData = rows.map(function(r, i) {
-      var school = colMap.school ? String(r[colMap.school] || '') : '';
+      var schoolRaw = colMap.school ? String(r[colMap.school] || '') : '';
       var address = colMap.address ? String(r[colMap.address] || '') : '';
-      var grade = colMap.grade ? String(r[colMap.grade] || '') : '';
+      var gradeRaw = colMap.grade ? String(r[colMap.grade] || '') : '';
       var year = colMap.year ? r[colMap.year] : null;
       var building = colMap.building ? String(r[colMap.building] || '') : '';
       var type = colMap.type ? String(r[colMap.type] || '') : '';
+      var area = colMap.area ? r[colMap.area] : null;
+
+      // 안전등급 정리: "B등급" → "B", "C" → "C"
+      var grade = gradeRaw.replace(/등급/g, '').replace(/\s/g, '').toUpperCase();
+      if (!['A','B','C','D','E'].includes(grade)) grade = '';
+
+      // 준공연도 정리
       if (year && typeof year === 'number') year = Math.floor(year);
+      else if (year) { var ym = String(year).match(/\d{4}/); year = ym ? parseInt(ym[0]) : null; }
+
+      // 학교명에서 학교명/동명 분리 (없으면 안전등급_건물명 사용)
+      var school = schoolRaw;
+      if (!building && schoolRaw) {
+        var parts = schoolRaw.match(/^(.+?(?:학교|고등학교|중학교|초등학교))\s*(.*)/);
+        if (parts) { school = parts[1]; if (parts[2]) building = parts[2]; }
+      }
+
       var risk = (grade || year) ? mapCalcRisk(grade, year) : null;
       return {
         id: i, school: school, building: building, address: address,
-        grade: grade, year: year, type: type,
+        grade: grade, year: year, type: type, area: area,
         sido: mapParseSido(address),
         risk: risk,
         gradeInfo: risk ? mapGetGrade(risk.total) : { label: '미분류', color: '#7a7a7a', key: 'unknown' }
@@ -7297,9 +7316,49 @@ function mapLoadExcel(input) {
   reader.readAsArrayBuffer(f);
 }
 
+// 시도별 대략 중심 좌표 (Geocoder 폴백용)
+var _sidoCenter = {
+  '서울':[37.5665,126.9780],'부산':[35.1796,129.0756],'대구':[35.8714,128.6014],
+  '인천':[37.4563,126.7052],'광주':[35.1595,126.8526],'대전':[36.3504,127.3845],
+  '울산':[35.5384,129.3114],'세종':[36.4800,127.2590],'경기':[37.2750,127.0094],
+  '강원':[37.8228,128.1555],'충북':[36.6357,127.4917],'충남':[36.6588,126.6728],
+  '전북':[35.8203,127.1089],'전남':[34.8161,126.4629],'경북':[36.4919,128.8889],
+  '경남':[35.4606,128.2132],'제주':[33.4890,126.4983],'기타':[36.5,127.5],'미분류':[36.5,127.5]
+};
+
+function mapCreateMarker(d) {
+  var color = d.gradeInfo.color;
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="32" viewBox="0 0 24 32">' +
+    '<path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 20 12 20s12-11 12-20C24 5.4 18.6 0 12 0z" fill="' + color + '"/>' +
+    '<circle cx="12" cy="11" r="5" fill="#fff" opacity="0.9"/></svg>';
+  var imgSrc = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  var img = new kakao.maps.MarkerImage(imgSrc, new kakao.maps.Size(24, 32), { offset: new kakao.maps.Point(12, 32) });
+  var marker = new kakao.maps.Marker({
+    position: new kakao.maps.LatLng(d.lat, d.lng),
+    image: img, title: d.school
+  });
+  marker._data = d;
+
+  var elapsed = d.year ? (new Date().getFullYear() - parseInt(d.year)) : '-';
+  var riskBar = d.risk ? ('<div style="background:#eee;border-radius:4px;height:6px;margin-top:4px;">' +
+    '<div style="width:' + (d.risk.total * 10) + '%;height:100%;background:' + color + ';border-radius:4px;"></div></div>') : '';
+  var iwContent = '<div style="padding:10px 14px;min-width:200px;font-family:Pretendard,sans-serif;">' +
+    '<div style="font-size:13px;font-weight:700;margin-bottom:4px;">' + d.school + (d.building ? ' ' + d.building : '') + '</div>' +
+    '<div style="font-size:11px;color:#555;margin-bottom:6px;">' + d.address + '</div>' +
+    '<div style="display:flex;gap:12px;font-size:11px;">' +
+      '<span>안전등급: <strong>' + (d.grade || '-') + '</strong></span>' +
+      '<span>준공: <strong>' + (d.year || '-') + '</strong></span>' +
+      '<span>경과: <strong>' + elapsed + '년</strong></span>' +
+    '</div>' +
+    '<div style="margin-top:6px;font-size:11px;">위험도: <strong style="color:' + color + ';">' +
+      (d.risk ? d.risk.total + '점 (' + d.gradeInfo.label + ')' : '미분류') + '</strong>' + riskBar + '</div></div>';
+  var infowindow = new kakao.maps.InfoWindow({ content: iwContent, removable: true });
+  kakao.maps.event.addListener(marker, 'click', function() { infowindow.open(_mapObj, marker); });
+  return marker;
+}
+
 function mapRenderMarkers() {
   if (!_mapObj) return;
-  // 기존 마커 제거
   _mapMarkers.forEach(function(m) { m.setMap(null); });
   _mapMarkers = [];
   if (_mapClusterer) _mapClusterer.clear();
@@ -7308,80 +7367,82 @@ function mapRenderMarkers() {
   var cached = localStorage.getItem('mapGeoCache');
   if (cached) try { _mapGeoCache = JSON.parse(cached); } catch(e) {}
 
-  var pending = 0, total = _mapData.length;
-  document.getElementById('mapDataCount').textContent = '로딩 중... 0/' + total;
+  var total = _mapData.length;
+  var processed = 0;
+  var needGeocode = [];
 
-  _mapData.forEach(function(d, idx) {
-    if (!d.address) { d._skip = true; return; }
+  document.getElementById('mapDataCount').textContent = '처리 중... 0/' + total;
 
-    function createMarker(lat, lng) {
-      d.lat = lat; d.lng = lng;
-      var color = d.gradeInfo.color;
-      var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="32" viewBox="0 0 24 32">' +
-        '<path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 20 12 20s12-11 12-20C24 5.4 18.6 0 12 0z" fill="' + color + '"/>' +
-        '<circle cx="12" cy="11" r="5" fill="#fff" opacity="0.9"/></svg>';
-      var imgSrc = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-      var img = new kakao.maps.MarkerImage(imgSrc, new kakao.maps.Size(24, 32), { offset: new kakao.maps.Point(12, 32) });
-
-      var marker = new kakao.maps.Marker({
-        position: new kakao.maps.LatLng(lat, lng),
-        image: img,
-        title: d.school
-      });
-      marker._data = d;
-      _mapMarkers.push(marker);
-
-      var elapsed = d.year ? (new Date().getFullYear() - parseInt(d.year)) : '-';
-      var riskBar = d.risk ? ('<div style="background:#eee;border-radius:4px;height:6px;margin-top:4px;">' +
-        '<div style="width:' + (d.risk.total * 10) + '%;height:100%;background:' + color + ';border-radius:4px;"></div></div>') : '';
-      var iwContent = '<div style="padding:10px 14px;min-width:200px;font-family:Pretendard,sans-serif;">' +
-        '<div style="font-size:13px;font-weight:700;margin-bottom:4px;">' + d.school + (d.building ? ' ' + d.building : '') + '</div>' +
-        '<div style="font-size:11px;color:#555;margin-bottom:6px;">' + d.address + '</div>' +
-        '<div style="display:flex;gap:12px;font-size:11px;">' +
-          '<span>안전등급: <strong>' + (d.grade || '-') + '</strong></span>' +
-          '<span>준공: <strong>' + (d.year || '-') + '</strong></span>' +
-          '<span>경과: <strong>' + elapsed + '년</strong></span>' +
-        '</div>' +
-        '<div style="margin-top:6px;font-size:11px;">위험도: <strong style="color:' + color + ';">' +
-          (d.risk ? d.risk.total + '점 (' + d.gradeInfo.label + ')' : '미분류') + '</strong>' + riskBar + '</div></div>';
-
-      var infowindow = new kakao.maps.InfoWindow({ content: iwContent, removable: true });
-      kakao.maps.event.addListener(marker, 'click', function() { infowindow.open(_mapObj, marker); });
-
-      pending++;
-      if (pending >= total || pending % 50 === 0) {
-        document.getElementById('mapDataCount').textContent = pending + '/' + total + ' 처리';
-      }
-      if (pending >= _mapData.filter(function(x){return !x._skip;}).length) {
-        mapApplyFilter();
-        localStorage.setItem('mapGeoCache', JSON.stringify(_mapGeoCache));
-        document.getElementById('mapDataCount').textContent = _mapData.length + '개 학교';
-      }
-    }
-
-    // 캐시 확인
-    if (_mapGeoCache[d.address]) {
+  // 1단계: 캐시된 좌표로 즉시 마커 생성
+  _mapData.forEach(function(d) {
+    if (!d.address) {
+      // 주소 없으면 시도 중심 + 랜덤 오프셋
+      var sc = _sidoCenter[d.sido] || _sidoCenter['미분류'];
+      d.lat = sc[0] + (Math.random() - 0.5) * 0.3;
+      d.lng = sc[1] + (Math.random() - 0.5) * 0.3;
+      _mapMarkers.push(mapCreateMarker(d));
+      processed++;
+    } else if (_mapGeoCache[d.address]) {
       var c = _mapGeoCache[d.address];
-      createMarker(c[0], c[1]);
+      d.lat = c[0]; d.lng = c[1];
+      _mapMarkers.push(mapCreateMarker(d));
+      processed++;
     } else {
-      setTimeout(function() {
-        geocoder.addressSearch(d.address, function(result, status) {
-          if (status === kakao.maps.services.Status.OK) {
-            var lat = parseFloat(result[0].y), lng = parseFloat(result[0].x);
-            _mapGeoCache[d.address] = [lat, lng];
-            createMarker(lat, lng);
-          } else {
-            pending++;
-            if (pending >= _mapData.filter(function(x){return !x._skip;}).length) {
-              mapApplyFilter();
-              localStorage.setItem('mapGeoCache', JSON.stringify(_mapGeoCache));
-              document.getElementById('mapDataCount').textContent = _mapData.length + '개 학교';
-            }
-          }
-        });
-      }, idx * 80);
+      needGeocode.push(d);
     }
   });
+
+  document.getElementById('mapDataCount').textContent = '캐시 ' + processed + '건 완료, 좌표변환 ' + needGeocode.length + '건...';
+
+  // 2단계: Geocoder 배치 처리 (초당 10건)
+  var batchIdx = 0;
+  var BATCH_SIZE = 10;
+  var BATCH_DELAY = 1100;
+
+  function processBatch() {
+    if (batchIdx >= needGeocode.length) {
+      // 전부 완료
+      localStorage.setItem('mapGeoCache', JSON.stringify(_mapGeoCache));
+      mapApplyFilter();
+      document.getElementById('mapDataCount').textContent = _mapData.length + '개 건물';
+      return;
+    }
+    var end = Math.min(batchIdx + BATCH_SIZE, needGeocode.length);
+    var remaining = needGeocode.length - batchIdx;
+    document.getElementById('mapDataCount').textContent = '좌표변환 중... ' + batchIdx + '/' + needGeocode.length + ' (남은 시간 ~' + Math.ceil(remaining / BATCH_SIZE * BATCH_DELAY / 1000 / 60) + '분)';
+
+    for (var i = batchIdx; i < end; i++) {
+      (function(d) {
+        geocoder.addressSearch(d.address, function(result, status) {
+          if (status === kakao.maps.services.Status.OK) {
+            d.lat = parseFloat(result[0].y); d.lng = parseFloat(result[0].x);
+            _mapGeoCache[d.address] = [d.lat, d.lng];
+          } else {
+            var sc = _sidoCenter[d.sido] || _sidoCenter['미분류'];
+            d.lat = sc[0] + (Math.random() - 0.5) * 0.2;
+            d.lng = sc[1] + (Math.random() - 0.5) * 0.2;
+          }
+          _mapMarkers.push(mapCreateMarker(d));
+        });
+      })(needGeocode[i]);
+    }
+    batchIdx = end;
+
+    // 중간 캐시 저장 (500건마다)
+    if (batchIdx % 500 < BATCH_SIZE) {
+      localStorage.setItem('mapGeoCache', JSON.stringify(_mapGeoCache));
+      mapApplyFilter();
+    }
+
+    setTimeout(processBatch, BATCH_DELAY);
+  }
+
+  if (needGeocode.length > 0) {
+    processBatch();
+  } else {
+    mapApplyFilter();
+    document.getElementById('mapDataCount').textContent = _mapData.length + '개 건물';
+  }
 }
 
 function mapApplyFilter() {
