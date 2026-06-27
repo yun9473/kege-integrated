@@ -2096,7 +2096,7 @@ table.dtable tbody tr{cursor:pointer;}
         <div style="font-size:11px;color:var(--gray);margin-top:8px;" id="mapLoadingPct">0%</div>
       </div>
       <!-- 지도 위 통계 오버레이 -->
-      <div id="mapStatsOverlay" style="position:absolute;top:12px;right:12px;background:rgba(255,255,255,0.95);border-radius:12px;padding:14px 18px;box-shadow:0 2px 8px rgba(0,0,0,0.1);min-width:200px;display:none;">
+      <div id="mapStatsOverlay" style="position:absolute;top:12px;right:12px;background:rgba(255,255,255,0.95);border-radius:12px;padding:14px 18px;box-shadow:0 2px 8px rgba(0,0,0,0.1);min-width:200px;">
         <div style="font-size:12px;font-weight:700;margin-bottom:8px;color:#1d1d1f;">📊 현황 요약</div>
         <div id="mapStatsContent" style="font-size:11px;color:#333;line-height:1.8;"></div>
       </div>
@@ -8037,7 +8037,7 @@ function mapClearData() {
   _mapMarkers = [];
   if (_mapClusterer) _mapClusterer.clear();
   document.getElementById('mapEmptyMsg').style.display = '';
-  document.getElementById('mapStatsOverlay').style.display = 'none';
+  document.getElementById('mapStatsContent').innerHTML = '<div style="color:#888;">데이터를 업로드하세요</div>';
   document.getElementById('mapDataCount').textContent = '';
   document.getElementById('mapSidoFilters').innerHTML = '';
   document.getElementById('mapExcelFile').value = '';
