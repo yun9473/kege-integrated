@@ -2319,7 +2319,7 @@ table.dtable tbody tr{cursor:pointer;}
 
   <!-- RESEARCH MODULE -->
   <div id="module-research" class="module-panel">
-    <div style="max-width:800px;margin:0 auto;padding:80px 24px 48px;">
+    <div style="max-width:800px;margin:0 auto;padding:32px 24px 48px;">
       <div style="text-align:center;margin-bottom:32px;">
         <div style="font-size:12px;font-weight:600;color:#0066cc;letter-spacing:.08em;margin-bottom:8px;">RESEARCH</div>
         <div style="font-size:40px;font-weight:600;color:#1d1d1f;letter-spacing:0;line-height:1.1;">연구 진행</div>
@@ -7631,7 +7631,7 @@ function mapBuildBubbleAgg() {
     var sgg = mapParseSigungu(d.address) || '기타';
     var addr = String(d.address || '').trim().split(/\s+/);
     var gu = addr.length >= 3 ? addr[2] : sgg;
-    var isDanger = d.gradeInfo && (d.gradeInfo.key === 'danger' || d.gradeInfo.key === 'warning');
+    var isDanger = d.gradeInfo && d.gradeInfo.key === 'danger';
 
     // 시도
     if (!_bubbleSidoAgg[sido]) _bubbleSidoAgg[sido] = { lats:[], lngs:[], total:0, danger:0, schools:new Set() };
