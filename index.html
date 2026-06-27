@@ -2119,7 +2119,7 @@ table.dtable tbody tr{cursor:pointer;}
 
   </div>
   <!-- 소분류: 지역별 비교 뷰 -->
-  <div id="mapSubView-region" style="display:none;overflow-y:auto;background:#fafafa;flex:1;min-height:0;">
+  <div id="mapSubView-region" style="display:none;overflow-y:auto;background:#fafafa;flex:1;min-height:0;height:0;">
     <div style="padding:16px 24px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
         <div style="font-size:15px;font-weight:700;color:#1d1d1f;">📊 지역별 비교 분석</div>
@@ -7765,12 +7765,22 @@ function mapUpdateStatsForViewport() {
 }
 
 function mapSwitchSub(view) {
-  document.getElementById('mapSubView-map').style.display = view === 'map' ? 'flex' : 'none';
-  document.getElementById('mapSubView-region').style.display = view === 'region' ? 'block' : 'none';
+  var mapView = document.getElementById('mapSubView-map');
+  var regionView = document.getElementById('mapSubView-region');
+  if (view === 'map') {
+    mapView.style.display = 'flex';
+    regionView.style.display = 'none';
+    regionView.style.height = '0';
+    if (_mapObj) _mapObj.relayout();
+  } else {
+    mapView.style.display = 'none';
+    regionView.style.display = 'block';
+    regionView.style.height = 'auto';
+    regionView.style.flex = '1';
+    if (_mapData.length) mapRegionView('sido');
+  }
   document.getElementById('mapSubTab-map').classList.toggle('active', view === 'map');
   document.getElementById('mapSubTab-region').classList.toggle('active', view === 'region');
-  if (view === 'map' && _mapObj) _mapObj.relayout();
-  if (view === 'region' && _mapData.length) mapRegionView('sido');
 }
 
 function mapBuildRegionDashboard() {
@@ -7937,11 +7947,15 @@ function mapShowSggSchools(sido, sgg) {
       var elapsed = d.year ? (new Date().getFullYear() - parseInt(d.year)) : '-';
       var color = d.gradeInfo.color;
       html += '<div style="background:#fff;border:1px solid #e0e0e0;border-left:4px solid '+color+';border-radius:10px;padding:12px 14px;cursor:pointer;" onclick="mapShowSchoolDetail('+d.id+')">';
-      html += '<div style="display:flex;justify-content:space-between;align-items:center;">';
-      html += '<div style="font-size:13px;font-weight:700;">' + d.school + (d.building ? ' <span style="font-weight:400;color:#888;">' + d.building + '</span>' : '') + '</div>';
-      html += '<span style="background:'+color+';color:#fff;padding:2px 8px;border-radius:9999px;font-size:10px;font-weight:700;">' + (d.risk?d.risk.total+'점':'') + ' ' + d.gradeInfo.label + '</span>';
+      html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">';
+      html += '<div style="min-width:0;flex:1;"><div style="font-size:13px;font-weight:700;word-break:keep-all;">' + d.school + '</div>';
+      if (d.building) html += '<div style="font-size:11px;color:#888;margin-top:1px;">' + d.building + '</div>';
       html += '</div>';
-      html += '<div style="font-size:11px;color:#666;margin-top:4px;">안전등급: ' + (d.grade||'-') + ' · 준공: ' + (d.year||'-') + ' · 경과: ' + elapsed + '년</div>';
+      html += '<span style="background:'+color+';color:#fff;padding:2px 8px;border-radius:9999px;font-size:10px;font-weight:700;white-space:nowrap;flex-shrink:0;">' + (d.risk?d.risk.total+'점':'') + ' ' + d.gradeInfo.label + '</span>';
+      html += '</div>';
+      html += '<div style="font-size:11px;color:#666;margin-top:6px;line-height:1.6;">';
+      html += '안전등급: <strong>' + (d.grade||'-') + '</strong> · 준공: <strong>' + (d.year||'-') + '</strong> · 경과: <strong>' + elapsed + '년</strong>';
+      html += '</div>';
       html += '</div>';
     });
     html += '</div>';
