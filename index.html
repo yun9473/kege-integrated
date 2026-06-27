@@ -7360,40 +7360,45 @@ function mapInitMarkerImages() {
 }
 
 function mapCreateMarker(d) {
-  var marker = new kakao.maps.Marker({
-    position: new kakao.maps.LatLng(d.lat, d.lng),
-    image: _markerImages[d.gradeInfo.key] || _markerImages.unknown
-  });
-  marker._data = d;
-  kakao.maps.event.addListener(marker, 'click', function() {
-    var color = d.gradeInfo.color;
-    var elapsed = d.year ? (new Date().getFullYear() - parseInt(d.year)) : '-';
-    var riskBar = d.risk ? ('<div style="background:#eee;border-radius:4px;height:6px;margin-top:4px;">' +
-      '<div style="width:' + (d.risk.total * 10) + '%;height:100%;background:' + color + ';border-radius:4px;"></div></div>') : '';
-    _globalInfoWindow.setContent(
-      '<div style="padding:10px 14px;min-width:200px;font-family:Pretendard,sans-serif;">' +
-      '<div style="font-size:13px;font-weight:700;margin-bottom:4px;">' + d.school + (d.building ? ' ' + d.building : '') + '</div>' +
-      '<div style="font-size:11px;color:#555;margin-bottom:6px;">' + d.address + '</div>' +
-      '<div style="display:flex;gap:12px;font-size:11px;">' +
-        '<span>안전등급: <strong>' + (d.grade || '-') + '</strong></span>' +
-        '<span>준공: <strong>' + (d.year || '-') + '</strong></span>' +
-        '<span>경과: <strong>' + elapsed + '년</strong></span>' +
-      '</div>' +
-      '<div style="margin-top:6px;font-size:11px;">위험도: <strong style="color:' + color + ';">' +
-        (d.risk ? d.risk.total + '점 (' + d.gradeInfo.label + ')' : '미분류') + '</strong>' + riskBar + '</div></div>'
-    );
-    _globalInfoWindow.open(_mapObj, marker);
-  });
-  return marker;
+  try {
+    var marker = new kakao.maps.Marker({
+      position: new kakao.maps.LatLng(d.lat, d.lng),
+      image: _markerImages[d.gradeInfo.key] || _markerImages.unknown
+    });
+    marker._data = d;
+    kakao.maps.event.addListener(marker, 'click', function() {
+      var color = d.gradeInfo.color;
+      var elapsed = d.year ? (new Date().getFullYear() - parseInt(d.year)) : '-';
+      var riskBar = d.risk ? ('<div style="background:#eee;border-radius:4px;height:6px;margin-top:4px;">' +
+        '<div style="width:' + (d.risk.total * 10) + '%;height:100%;background:' + color + ';border-radius:4px;"></div></div>') : '';
+      _globalInfoWindow.setContent(
+        '<div style="padding:10px 14px;min-width:200px;font-family:Pretendard,sans-serif;">' +
+        '<div style="font-size:13px;font-weight:700;margin-bottom:4px;">' + d.school + (d.building ? ' ' + d.building : '') + '</div>' +
+        '<div style="font-size:11px;color:#555;margin-bottom:6px;">' + d.address + '</div>' +
+        '<div style="display:flex;gap:12px;font-size:11px;">' +
+          '<span>안전등급: <strong>' + (d.grade || '-') + '</strong></span>' +
+          '<span>준공: <strong>' + (d.year || '-') + '</strong></span>' +
+          '<span>경과: <strong>' + elapsed + '년</strong></span>' +
+        '</div>' +
+        '<div style="margin-top:6px;font-size:11px;">위험도: <strong style="color:' + color + ';">' +
+          (d.risk ? d.risk.total + '점 (' + d.gradeInfo.label + ')' : '미분류') + '</strong>' + riskBar + '</div></div>'
+      );
+      _globalInfoWindow.open(_mapObj, marker);
+    });
+    return marker;
+  } catch(error) {
+    console.error('mapCreateMarker ERROR', d, error);
+    return null;
+  }
 }
 
 function mapRenderMarkers() {
-  if (!_mapObj) return;
+  console.log('ENTER mapRenderMarkers');
+  if (!_mapObj) { console.log('mapRenderMarkers: _mapObj is null, RETURN'); return; }
   _mapMarkers.forEach(function(m) { m.setMap(null); });
   _mapMarkers = [];
   if (_mapClusterer) _mapClusterer.clear();
 
-  var geocoder = new kakao.maps.services.Geocoder();
   var cached = localStorage.getItem('mapGeoCache');
   if (cached) try { _mapGeoCache = JSON.parse(cached); } catch(e) {}
 
@@ -7402,12 +7407,28 @@ function mapRenderMarkers() {
 
   mapShowLoading('0단계: 서버 캐시 로드', '미리 변환된 좌표 확인 중...', 0);
 
-  // 0단계: 서버 geo-cache.json 로드 시도
+  // geo-cache.json fetch
+  console.log('FETCH geo-cache.json START');
+  fetch('data/geo-cache.json').then(function(r) {
+    console.log('FETCH geo-cache.json response:', r.status, r.ok);
+    if (!r.ok) throw new Error('no cache');
+    return r.json();
+  }).then(function(serverCache) {
+    var cnt = Object.keys(serverCache).length;
+    console.log('FETCH geo-cache.json PARSED:', cnt, 'entries');
+    for (var k in serverCache) { if (!_mapGeoCache[k]) _mapGeoCache[k] = serverCache[k]; }
+    mapShowLoading('서버 캐시 로드', cnt + '건 좌표 로드 완료', 3);
+    afterPreCache();
+  }).catch(function(err) {
+    console.log('FETCH geo-cache.json FAILED:', err);
+    afterPreCache();
+  });
+
   function afterPreCache() {
+    console.log('ENTER afterPreCache');
     var needGeocode = [];
 
     console.time('geo-cache-match');
-    // 1단계: 좌표 매칭 (마커는 아직 안 만듦)
     var cachedItems = [];
     _mapData.forEach(function(d) {
       if (!d.address) {
@@ -7424,143 +7445,143 @@ function mapRenderMarkers() {
       }
     });
     console.timeEnd('geo-cache-match');
-    console.log('cached:', cachedItems.length, 'needGeocode:', needGeocode.length);
+    console.log('cached:', cachedItems.length);
+    console.log('needGeocode:', needGeocode.length);
 
     mapShowLoading('1단계: 좌표 매칭', cachedItems.length + '건 매칭 완료', 5);
 
-    // 마커 배치 생성 (requestAnimationFrame, 200개씩)
     var mkIdx = 0;
     var MK_BATCH = 200;
     console.time('build-all-markers');
+    console.log('buildMarkerBatch STARTING, total cachedItems:', cachedItems.length);
+
     function buildMarkerBatch() {
-      if (mkIdx >= cachedItems.length) {
-        console.timeEnd('build-all-markers');
-        console.log('markers:', _mapMarkers.length);
-        doneCount = cachedItems.length;
-        var pct1 = Math.round(doneCount / total * 100);
-        mapShowLoading('1단계 완료', doneCount + '건 마커 생성 완료', pct1);
-        document.getElementById('mapDataCount').textContent = doneCount + ' / ' + total;
-        // 클러스터러에 한 번만 등록
-        console.time('first-filter');
-        mapApplyFilter();
-        console.timeEnd('first-filter');
-        if (needGeocode.length === 0) {
-          mapShowLoading('완료!', total + '개 건물 표시', 100);
-          setTimeout(mapHideLoading, 1500);
-        } else {
-          startGeocoding();
+      try {
+        console.log('ENTER buildMarkerBatch, mkIdx=' + mkIdx + ', cachedItems=' + cachedItems.length);
+
+        if (mkIdx >= cachedItems.length) {
+          console.timeEnd('build-all-markers');
+          console.log('markers:', _mapMarkers.length);
+          doneCount = cachedItems.length;
+          var pct1 = Math.round(doneCount / total * 100);
+          mapShowLoading('1단계 완료', doneCount + '건 마커 생성 완료', pct1);
+          document.getElementById('mapDataCount').textContent = doneCount + ' / ' + total;
+
+          console.log('CALLING mapApplyFilter (first-filter)');
+          console.time('first-filter');
+          mapApplyFilter();
+          console.timeEnd('first-filter');
+
+          if (needGeocode.length === 0) {
+            console.log('NO geocoding needed, RENDER COMPLETE');
+            mapShowLoading('완료!', total + '개 건물 표시', 100);
+            setTimeout(mapHideLoading, 1500);
+          } else {
+            console.log('CALLING startGeocoding');
+            startGeocoding();
+          }
+          return;
         }
-        return;
+
+        var end = Math.min(mkIdx + MK_BATCH, cachedItems.length);
+        console.time('batch-' + mkIdx);
+        for (var i = mkIdx; i < end; i++) {
+          var marker = mapCreateMarker(cachedItems[i]);
+          if (marker) { _mapMarkers.push(marker); }
+        }
+        console.timeEnd('batch-' + mkIdx);
+        mkIdx = end;
+        var pct = Math.round(mkIdx / total * 100);
+        mapShowLoading('마커 생성 중 (' + mkIdx + '/' + cachedItems.length + ')', Math.round(mkIdx/cachedItems.length*100) + '% 완료', pct);
+        document.getElementById('mapDataCount').textContent = mkIdx + ' / ' + total;
+        console.log('SCHEDULING next buildMarkerBatch via rAF');
+        requestAnimationFrame(buildMarkerBatch);
+      } catch(error) {
+        console.error('buildMarkerBatch ERROR', error);
+        console.error('mkIdx =', mkIdx);
+        console.error('cachedItems =', cachedItems.length);
       }
-      var end = Math.min(mkIdx + MK_BATCH, cachedItems.length);
-      console.time('batch-' + mkIdx);
-      for (var i = mkIdx; i < end; i++) {
-        _mapMarkers.push(mapCreateMarker(cachedItems[i]));
-      }
-      console.timeEnd('batch-' + mkIdx);
-      mkIdx = end;
-      var pct = Math.round(mkIdx / total * 100);
-      mapShowLoading('마커 생성 중 (' + mkIdx + '/' + cachedItems.length + ')', Math.round(mkIdx/cachedItems.length*100) + '% 완료', pct);
-      document.getElementById('mapDataCount').textContent = mkIdx + ' / ' + total;
-      requestAnimationFrame(buildMarkerBatch);
     }
+    console.log('SCHEDULING first buildMarkerBatch via rAF');
     requestAnimationFrame(buildMarkerBatch);
-    return; // startGeocoding은 buildMarkerBatch 완료 후 호출
+    return;
 
     function startGeocoding() {
-    // 2단계: 고유 주소만 Geocoding (중복 제거)
-    var uniqueAddrs = {};
-    needGeocode.forEach(function(d) {
-      if (!uniqueAddrs[d.address]) uniqueAddrs[d.address] = [];
-      uniqueAddrs[d.address].push(d);
-    });
-    var addrList = Object.keys(uniqueAddrs);
-    var geocoder = new kakao.maps.services.Geocoder();
-    var batchIdx = 0;
-    var BATCH_SIZE = 30;
-    var BATCH_DELAY = 1100;
-    var addrTotal = addrList.length;
+      console.log('ENTER startGeocoding');
+      var uniqueAddrs = {};
+      needGeocode.forEach(function(d) {
+        if (!uniqueAddrs[d.address]) uniqueAddrs[d.address] = [];
+        uniqueAddrs[d.address].push(d);
+      });
+      var addrList = Object.keys(uniqueAddrs);
+      var geocoder = new kakao.maps.services.Geocoder();
+      var batchIdx = 0;
+      var BATCH_SIZE = 30;
+      var BATCH_DELAY = 1100;
+      var addrTotal = addrList.length;
+      console.log('startGeocoding: uniqueAddrs=' + addrTotal);
 
-    mapShowLoading('2단계: 좌표 변환', '고유 주소 ' + addrTotal + '건 (건물 ' + needGeocode.length + '건)', pct1);
+      function processBatch() {
+        console.log('ENTER processBatch, batchIdx=' + batchIdx + '/' + addrTotal);
+        if (batchIdx >= addrTotal) {
+          console.log('processBatch COMPLETE');
+          localStorage.setItem('mapGeoCache', JSON.stringify(_mapGeoCache));
+          mapApplyFilter();
+          document.getElementById('mapDataCount').textContent = total + '개 건물';
+          mapShowLoading('완료!', total + '개 건물 표시', 100);
+          setTimeout(mapHideLoading, 1500);
+          return;
+        }
+        var end = Math.min(batchIdx + BATCH_SIZE, addrTotal);
+        var convertedBuildings = 0;
+        for (var ci = 0; ci < batchIdx; ci++) {
+          convertedBuildings += uniqueAddrs[addrList[ci]].length;
+        }
+        var allDone = doneCount + convertedBuildings;
+        var pct = Math.round(allDone / total * 100);
+        var remaining = addrTotal - batchIdx;
+        var secLeft = Math.ceil(remaining / BATCH_SIZE * BATCH_DELAY / 1000);
+        var timeStr = secLeft >= 60 ? Math.ceil(secLeft / 60) + '분' : secLeft + '초';
+        mapShowLoading('2단계: 좌표 변환 (' + allDone + '/' + total + ')', '주소: ' + batchIdx + '/' + addrTotal + ' | ~' + timeStr + ' 남음', pct);
+        document.getElementById('mapDataCount').textContent = allDone + ' / ' + total;
 
-    function processBatch() {
-      if (batchIdx >= addrTotal) {
-        localStorage.setItem('mapGeoCache', JSON.stringify(_mapGeoCache));
-        mapApplyFilter();
-        document.getElementById('mapDataCount').textContent = total + '개 건물';
-        mapShowLoading('완료!', total + '개 건물 표시', 100);
-        setTimeout(mapHideLoading, 1500);
-        return;
-      }
-
-      var end = Math.min(batchIdx + BATCH_SIZE, addrTotal);
-      // 진행률: 변환된 고유주소 → 해당 건물 수 합산
-      var convertedBuildings = 0;
-      for (var ci = 0; ci < batchIdx; ci++) {
-        convertedBuildings += uniqueAddrs[addrList[ci]].length;
-      }
-      var allDone = doneCount + convertedBuildings;
-      var pct = Math.round(allDone / total * 100);
-      var remaining = addrTotal - batchIdx;
-      var secLeft = Math.ceil(remaining / BATCH_SIZE * BATCH_DELAY / 1000);
-      var timeStr = secLeft >= 60 ? Math.ceil(secLeft / 60) + '분' : secLeft + '초';
-      mapShowLoading(
-        '2단계: 좌표 변환 (' + allDone + '/' + total + ')',
-        '주소: ' + batchIdx + '/' + addrTotal + ' | ~' + timeStr + ' 남음',
-        pct
-      );
-      document.getElementById('mapDataCount').textContent = allDone + ' / ' + total;
-
-      for (var i = batchIdx; i < end; i++) {
-        (function(addr) {
-          geocoder.addressSearch(addr, function(result, status) {
-            var lat, lng;
-            if (status === kakao.maps.services.Status.OK) {
-              lat = parseFloat(result[0].y); lng = parseFloat(result[0].x);
-              _mapGeoCache[addr] = [lat, lng];
-            } else {
-              var sido = mapParseSido(addr);
-              var sc = _sidoCenter[sido] || _sidoCenter['미분류'];
-              lat = sc[0] + (Math.random() - 0.5) * 0.2;
-              lng = sc[1] + (Math.random() - 0.5) * 0.2;
-            }
-            // 같은 주소의 모든 건물에 좌표 적용
-            uniqueAddrs[addr].forEach(function(d) {
-              d.lat = lat; d.lng = lng;
-              _mapMarkers.push(mapCreateMarker(d));
+        for (var i = batchIdx; i < end; i++) {
+          (function(addr) {
+            geocoder.addressSearch(addr, function(result, status) {
+              var lat, lng;
+              if (status === kakao.maps.services.Status.OK) {
+                lat = parseFloat(result[0].y); lng = parseFloat(result[0].x);
+                _mapGeoCache[addr] = [lat, lng];
+              } else {
+                var sido = mapParseSido(addr);
+                var sc = _sidoCenter[sido] || _sidoCenter['미분류'];
+                lat = sc[0] + (Math.random() - 0.5) * 0.2;
+                lng = sc[1] + (Math.random() - 0.5) * 0.2;
+              }
+              uniqueAddrs[addr].forEach(function(d) {
+                d.lat = lat; d.lng = lng;
+                var mk = mapCreateMarker(d);
+                if (mk) _mapMarkers.push(mk);
+              });
             });
-          });
-        })(addrList[i]);
+          })(addrList[i]);
+        }
+        batchIdx = end;
+        if (batchIdx % 150 < BATCH_SIZE) {
+          localStorage.setItem('mapGeoCache', JSON.stringify(_mapGeoCache));
+          mapApplyFilter();
+        }
+        setTimeout(processBatch, BATCH_DELAY);
       }
-      batchIdx = end;
-
-      if (batchIdx % 150 < BATCH_SIZE) {
-        localStorage.setItem('mapGeoCache', JSON.stringify(_mapGeoCache));
-        mapApplyFilter();
-      }
-      setTimeout(processBatch, BATCH_DELAY);
+      processBatch();
     }
-    processBatch();
-    } // end startGeocoding
   }
-
-  // geo-cache.json fetch
-  fetch('data/geo-cache.json').then(function(r) {
-    if (!r.ok) throw new Error('no cache');
-    return r.json();
-  }).then(function(serverCache) {
-    var cnt = Object.keys(serverCache).length;
-    for (var k in serverCache) { if (!_mapGeoCache[k]) _mapGeoCache[k] = serverCache[k]; }
-    mapShowLoading('서버 캐시 로드', cnt + '건 좌표 로드 완료', 3);
-    afterPreCache();
-  }).catch(function() {
-    afterPreCache();
-  });
 }
 
 function mapApplyFilter() {
-  if (!_mapObj) return;
-  // 체크 상태 수집
+  console.log('ENTER mapApplyFilter, _mapMarkers.length=' + _mapMarkers.length);
+  if (!_mapObj) { console.log('mapApplyFilter: _mapObj null, RETURN'); return; }
+
   var gradeFilter = {};
   document.querySelectorAll('#tab-map input[data-grade]').forEach(function(cb) {
     gradeFilter[cb.dataset.grade] = cb.checked;
@@ -7573,22 +7594,21 @@ function mapApplyFilter() {
   var minElapsed = parseInt(document.getElementById('mapYearSlider').value) || 0;
   document.getElementById('mapYearVal').textContent = minElapsed + '년+';
 
+  console.time('filter-loop');
   var visible = [];
   _mapMarkers.forEach(function(m) {
     var d = m._data;
     var show = true;
-    // 등급 필터
     if (!gradeFilter[d.gradeInfo.key]) show = false;
-    // 시도 필터
     if (!allSido && !sidoFilter[d.sido]) show = false;
-    // 경과연수 필터
     if (minElapsed > 0 && d.year) {
       var elapsed = new Date().getFullYear() - parseInt(d.year);
       if (elapsed < minElapsed) show = false;
     }
     if (show) visible.push(m);
-    m.setMap(null);
   });
+  console.timeEnd('filter-loop');
+  console.log('visible:', visible.length);
 
   if (_mapClusterer) {
     console.time('clusterer-clear');
@@ -7598,6 +7618,7 @@ function mapApplyFilter() {
     _mapClusterer.addMarkers(visible);
     console.timeEnd('clusterer-addMarkers(' + visible.length + ')');
   }
+  console.log('mapApplyFilter DONE');
 }
 
 function mapBuildSidoFilters() {
