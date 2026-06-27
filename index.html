@@ -7212,6 +7212,7 @@ function mapInitKakao() {
           {width:'52px',height:'52px',background:'rgba(220,38,38,.85)',borderRadius:'50%',color:'#fff',textAlign:'center',lineHeight:'52px',fontSize:'14px',fontWeight:'700'}
         ]
       });
+      mapInitMarkerImages();
       _mapInited = true;
     });
   } catch(e) {
@@ -7339,34 +7340,50 @@ var _sidoCenter = {
   '경남':[35.4606,128.2132],'제주':[33.4890,126.4983],'기타':[36.5,127.5],'미분류':[36.5,127.5]
 };
 
+// ── 마커 이미지 & 인포윈도우 최적화 ──
+var _markerImages = {};
+var _globalInfoWindow = null;
+
+function mapInitMarkerImages() {
+  if (Object.keys(_markerImages).length > 0) return;
+  var colors = {
+    danger: '#dc2626', warning: '#d97706', caution: '#0066cc', good: '#059669', unknown: '#7a7a7a'
+  };
+  for (var key in colors) {
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="32" viewBox="0 0 24 32">' +
+      '<path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 20 12 20s12-11 12-20C24 5.4 18.6 0 12 0z" fill="' + colors[key] + '"/>' +
+      '<circle cx="12" cy="11" r="5" fill="#fff" opacity="0.9"/></svg>';
+    var src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    _markerImages[key] = new kakao.maps.MarkerImage(src, new kakao.maps.Size(24, 32), { offset: new kakao.maps.Point(12, 32) });
+  }
+  _globalInfoWindow = new kakao.maps.InfoWindow({ removable: true });
+}
+
 function mapCreateMarker(d) {
-  var color = d.gradeInfo.color;
-  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="32" viewBox="0 0 24 32">' +
-    '<path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 20 12 20s12-11 12-20C24 5.4 18.6 0 12 0z" fill="' + color + '"/>' +
-    '<circle cx="12" cy="11" r="5" fill="#fff" opacity="0.9"/></svg>';
-  var imgSrc = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-  var img = new kakao.maps.MarkerImage(imgSrc, new kakao.maps.Size(24, 32), { offset: new kakao.maps.Point(12, 32) });
   var marker = new kakao.maps.Marker({
     position: new kakao.maps.LatLng(d.lat, d.lng),
-    image: img, title: d.school
+    image: _markerImages[d.gradeInfo.key] || _markerImages.unknown
   });
   marker._data = d;
-
-  var elapsed = d.year ? (new Date().getFullYear() - parseInt(d.year)) : '-';
-  var riskBar = d.risk ? ('<div style="background:#eee;border-radius:4px;height:6px;margin-top:4px;">' +
-    '<div style="width:' + (d.risk.total * 10) + '%;height:100%;background:' + color + ';border-radius:4px;"></div></div>') : '';
-  var iwContent = '<div style="padding:10px 14px;min-width:200px;font-family:Pretendard,sans-serif;">' +
-    '<div style="font-size:13px;font-weight:700;margin-bottom:4px;">' + d.school + (d.building ? ' ' + d.building : '') + '</div>' +
-    '<div style="font-size:11px;color:#555;margin-bottom:6px;">' + d.address + '</div>' +
-    '<div style="display:flex;gap:12px;font-size:11px;">' +
-      '<span>안전등급: <strong>' + (d.grade || '-') + '</strong></span>' +
-      '<span>준공: <strong>' + (d.year || '-') + '</strong></span>' +
-      '<span>경과: <strong>' + elapsed + '년</strong></span>' +
-    '</div>' +
-    '<div style="margin-top:6px;font-size:11px;">위험도: <strong style="color:' + color + ';">' +
-      (d.risk ? d.risk.total + '점 (' + d.gradeInfo.label + ')' : '미분류') + '</strong>' + riskBar + '</div></div>';
-  var infowindow = new kakao.maps.InfoWindow({ content: iwContent, removable: true });
-  kakao.maps.event.addListener(marker, 'click', function() { infowindow.open(_mapObj, marker); });
+  kakao.maps.event.addListener(marker, 'click', function() {
+    var color = d.gradeInfo.color;
+    var elapsed = d.year ? (new Date().getFullYear() - parseInt(d.year)) : '-';
+    var riskBar = d.risk ? ('<div style="background:#eee;border-radius:4px;height:6px;margin-top:4px;">' +
+      '<div style="width:' + (d.risk.total * 10) + '%;height:100%;background:' + color + ';border-radius:4px;"></div></div>') : '';
+    _globalInfoWindow.setContent(
+      '<div style="padding:10px 14px;min-width:200px;font-family:Pretendard,sans-serif;">' +
+      '<div style="font-size:13px;font-weight:700;margin-bottom:4px;">' + d.school + (d.building ? ' ' + d.building : '') + '</div>' +
+      '<div style="font-size:11px;color:#555;margin-bottom:6px;">' + d.address + '</div>' +
+      '<div style="display:flex;gap:12px;font-size:11px;">' +
+        '<span>안전등급: <strong>' + (d.grade || '-') + '</strong></span>' +
+        '<span>준공: <strong>' + (d.year || '-') + '</strong></span>' +
+        '<span>경과: <strong>' + elapsed + '년</strong></span>' +
+      '</div>' +
+      '<div style="margin-top:6px;font-size:11px;">위험도: <strong style="color:' + color + ';">' +
+        (d.risk ? d.risk.total + '점 (' + d.gradeInfo.label + ')' : '미분류') + '</strong>' + riskBar + '</div></div>'
+    );
+    _globalInfoWindow.open(_mapObj, marker);
+  });
   return marker;
 }
 
@@ -7408,17 +7425,18 @@ function mapRenderMarkers() {
       }
     });
 
-    // 마커 배치 생성 (500개씩, UI 안 멈추게)
+    // 마커 배치 생성 (requestAnimationFrame, 200개씩)
     var mkIdx = 0;
-    var MK_BATCH = 500;
+    var MK_BATCH = 200;
     function buildMarkerBatch() {
       if (mkIdx >= cachedItems.length) {
         doneCount = cachedItems.length;
         var pct1 = Math.round(doneCount / total * 100);
-        mapShowLoading('1단계 완료', doneCount + '건 마커 생성 / ' + needGeocode.length + '건 변환 필요', pct1);
+        mapShowLoading('1단계 완료', doneCount + '건 마커 생성 완료', pct1);
         document.getElementById('mapDataCount').textContent = doneCount + ' / ' + total;
+        // 클러스터러에 한 번만 등록
+        mapApplyFilter();
         if (needGeocode.length === 0) {
-          mapApplyFilter();
           mapShowLoading('완료!', total + '개 건물 표시', 100);
           setTimeout(mapHideLoading, 1500);
         } else {
@@ -7432,11 +7450,11 @@ function mapRenderMarkers() {
       }
       mkIdx = end;
       var pct = Math.round(mkIdx / total * 100);
-      mapShowLoading('1단계: 마커 생성 (' + mkIdx + '/' + cachedItems.length + ')', '캐시 적용 중...', pct);
+      mapShowLoading('마커 생성 중 (' + mkIdx + '/' + cachedItems.length + ')', Math.round(mkIdx/cachedItems.length*100) + '% 완료', pct);
       document.getElementById('mapDataCount').textContent = mkIdx + ' / ' + total;
-      setTimeout(buildMarkerBatch, 10);
+      requestAnimationFrame(buildMarkerBatch);
     }
-    buildMarkerBatch();
+    requestAnimationFrame(buildMarkerBatch);
     return; // startGeocoding은 buildMarkerBatch 완료 후 호출
 
     function startGeocoding() {
