@@ -2050,10 +2050,10 @@ table.dtable tbody tr{cursor:pointer;}
         <label class="map-filter-item" style="--fc:#7a7a7a"><input type="checkbox" checked onchange="mapApplyFilter()" data-grade="unknown"><span class="map-dot" style="background:#7a7a7a"></span> 미분류</label>
       </div>
 
-      <!-- 시도별 필터 -->
+      <!-- 시도별 필터 (아코디언) -->
       <div style="margin-bottom:18px;">
         <div style="font-size:11px;font-weight:700;color:var(--gray);margin-bottom:8px;text-transform:uppercase;">시도별</div>
-        <div id="mapSidoFilters" style="display:flex;flex-direction:column;gap:4px;"></div>
+        <div id="mapSidoFilters" style="display:flex;flex-direction:column;gap:2px;"></div>
       </div>
 
       <!-- 경과연수 필터 -->
@@ -7649,22 +7649,78 @@ function mapApplyFilter() {
   console.log('mapApplyFilter DONE');
 }
 
+function mapParseSigungu(address) {
+  if (!address) return '';
+  var s = String(address).trim();
+  var parts = s.split(/\s+/);
+  if (parts.length >= 2) {
+    var sg = parts[1];
+    if (parts.length >= 3 && (parts[1].endsWith('시') || parts[1].endsWith('도')) && (parts[2].endsWith('구') || parts[2].endsWith('군'))) {
+      sg = parts[1] + ' ' + parts[2];
+    }
+    return sg;
+  }
+  return '';
+}
+
 function mapBuildSidoFilters() {
-  var sidos = {};
-  _mapData.forEach(function(d) { sidos[d.sido] = (sidos[d.sido] || 0) + 1; });
+  // 시도 → 시군구 → { total, danger } 집계
+  var sidoMap = {};
+  _mapData.forEach(function(d) {
+    if (!sidoMap[d.sido]) sidoMap[d.sido] = { total: 0, danger: 0, schools: new Set(), sgg: {} };
+    var sm = sidoMap[d.sido];
+    sm.total++;
+    sm.schools.add(d.school);
+    if (d.gradeInfo.key === 'danger' || d.gradeInfo.key === 'warning') sm.danger++;
+
+    var sgg = mapParseSigungu(d.address) || '기타';
+    if (!sm.sgg[sgg]) sm.sgg[sgg] = { total: 0, danger: 0, schools: new Set() };
+    sm.sgg[sgg].total++;
+    sm.sgg[sgg].schools.add(d.school);
+    if (d.gradeInfo.key === 'danger' || d.gradeInfo.key === 'warning') sm.sgg[sgg].danger++;
+  });
+
   var el = document.getElementById('mapSidoFilters');
   el.innerHTML = '';
-  var sorted = Object.keys(sidos).sort(function(a, b) { return sidos[b] - sidos[a]; });
+  var sorted = Object.keys(sidoMap).sort(function(a, b) { return sidoMap[b].schools.size - sidoMap[a].schools.size; });
+
   sorted.forEach(function(sido) {
-    var chip = document.createElement('span');
+    var sm = sidoMap[sido];
+    var schoolCnt = sm.schools.size;
+
+    // 시도 헤더
+    var wrapper = document.createElement('div');
+    wrapper.style.cssText = 'margin-bottom:2px;';
+
+    var chip = document.createElement('div');
     chip.className = 'map-sido-chip';
     chip.dataset.sido = sido;
-    chip.textContent = sido + ' (' + sidos[sido] + ')';
-    chip.onclick = function() {
+    chip.style.cssText = 'width:100%;justify-content:space-between;display:flex;padding:6px 10px;';
+    chip.innerHTML = '<span>' + sido + '</span><span style="font-size:10px;color:#888;">' + schoolCnt + '교</span>';
+    chip.onclick = function(e) {
       this.classList.toggle('active');
+      var sub = this.parentNode.querySelector('.map-sgg-list');
+      if (sub) sub.style.display = this.classList.contains('active') ? 'block' : 'none';
       mapApplyFilter();
     };
-    el.appendChild(chip);
+    wrapper.appendChild(chip);
+
+    // 시군구 하위 목록
+    var sggList = document.createElement('div');
+    sggList.className = 'map-sgg-list';
+    sggList.style.cssText = 'display:none;padding:4px 0 4px 12px;';
+    var sggSorted = Object.keys(sm.sgg).sort(function(a, b) { return sm.sgg[b].schools.size - sm.sgg[a].schools.size; });
+    sggSorted.forEach(function(sgg) {
+      var sg = sm.sgg[sgg];
+      var dangerSchools = sg.danger;
+      var totalSchools = sg.schools.size;
+      var item = document.createElement('div');
+      item.style.cssText = 'font-size:11px;padding:3px 0;display:flex;justify-content:space-between;color:#444;';
+      item.innerHTML = '<span>' + sgg + '</span><span style="color:' + (dangerSchools > 0 ? '#dc2626' : '#059669') + ';font-weight:600;">' + dangerSchools + '/' + totalSchools + '교</span>';
+      sggList.appendChild(item);
+    });
+    wrapper.appendChild(sggList);
+    el.appendChild(wrapper);
   });
 }
 
