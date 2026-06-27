@@ -2526,6 +2526,23 @@ function switchModule(mod, el) {
   window.scrollTo(0,0);
   document.querySelectorAll('.body-wrap').forEach(function(bw){bw.scrollTop=0;});
   document.querySelectorAll('.main').forEach(function(m){m.scrollTop=0;});
+  // 지도 전체화면 해제
+  var mapMain = document.querySelector('#tab-map > .main');
+  if (mapMain && mapMain.style.position === 'fixed') {
+    mapMain.style.position = ''; mapMain.style.top = ''; mapMain.style.left = '';
+    mapMain.style.width = ''; mapMain.style.height = ''; mapMain.style.zIndex = '';
+    var fsBtn = document.getElementById('mapFullscreenBtn');
+    if (fsBtn) fsBtn.textContent = '⛶ 전체화면';
+  }
+  // 대시보드 탭 초기화 (지도→다른 모듈 전환 시 지도가 남는 문제 방지)
+  if (mod !== 'dashboard') {
+    document.querySelectorAll('#module-dashboard .tab-content').forEach(function(t){ t.classList.remove('active'); });
+    var overviewTab = document.getElementById('tab-overview');
+    if (overviewTab) overviewTab.classList.add('active');
+    document.querySelectorAll('#module-dashboard .tab-bar .tab').forEach(function(t){ t.classList.remove('active'); });
+    var firstTab = document.querySelector('#module-dashboard .tab-bar .tab');
+    if (firstTab) firstTab.classList.add('active');
+  }
   if (mod === 'dashboard') {
     setTimeout(function(){ window.dispatchEvent(new Event('resize')); }, 150);
   }
