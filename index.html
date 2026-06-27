@@ -7247,19 +7247,18 @@ function mlog() { if (MAP_DEBUG) console.log.apply(console, arguments); }
 
 // ── 전역 상태 ──
 var M = {
-  data: [],              // 전체 데이터 배열
-  dataById: new Map(),   // id → data
-  dataByAddr: new Map(), // address → [lat,lng]
-  map: null,             // kakao.maps.Map
-  clusterer: null,       // MarkerClusterer
-  markerImages: {},      // key → MarkerImage (5개)
-  infoWindow: null,      // 전역 InfoWindow 1개
-  markerPool: new Map(), // id → Marker (재사용)
-  activeIds: new Set(),  // 현재 clusterer에 등록된 id
+  data: [],
+  dataById: new Map(),
+  dataByAddr: new Map(),
+  map: null,
+  markerImages: {},
+  infoWindow: null,
+  markerPool: new Map(),
+  activeIds: new Set(),
   ready: false,
   initPromise: null,
   viewTimer: null,
-  scoreMode: 'both',     // 'both','safety','age'
+  scoreMode: 'both',
   lastBounds: null,
 };
 // ── GeoCacheManager ──
@@ -7279,60 +7278,38 @@ var GeoCache = {
 // ── MapManager ──
 var _mapInitedFlag = false;
 var _mapObj = null;
-var _mapClusterer = null;
 var _mapData = [];
 var _mapSchools = [];
 var _mapMarkers = [];
 var _mapGeoCache = {};
 var _mapInitPromise = null;
+
+// ── 버블 시스템 전역 ──
+var _bubbleSidoAgg = {};
+var _bubbleSggAgg = {};
+var _bubbleGuAgg = {};
+var _currentBubbles = [];
+var _lastBubbleZoomTier = null;
+
 function mapInitKakao() {
   if (_mapInitPromise) return _mapInitPromise;
   _mapInitPromise = new Promise(function(resolve) {
     function tryInit() {
-      console.log('mapInitKakao tryInit: kakao=' + (typeof kakao !== 'undefined') + ', _mapInitedFlag=' + _mapInitedFlag);
-      if (_mapInitedFlag && _mapObj && _mapClusterer) {
-        console.log('mapInitKakao: already initialized');
-        resolve(); return;
-      }
-      if (typeof kakao === 'undefined' || !kakao.maps) {
-        console.log('mapInitKakao: SDK not loaded, retry in 500ms');
-        setTimeout(tryInit, 500);
-        return;
-      }
+      if (_mapInitedFlag && _mapObj) { resolve(); return; }
+      if (typeof kakao === 'undefined' || !kakao.maps) { setTimeout(tryInit, 500); return; }
       try {
         kakao.maps.load(function() {
-          console.log('mapInitKakao: kakao.maps.load callback');
           var container = document.getElementById('mapContainer');
-          if (!container) { console.error('mapInitKakao: #mapContainer not found'); resolve(); return; }
+          if (!container) { resolve(); return; }
           _mapObj = new kakao.maps.Map(container, {
             center: new kakao.maps.LatLng(36.5, 127.5),
             level: 12
           });
-          _mapClusterer = new kakao.maps.MarkerClusterer({
-            map: _mapObj, averageCenter: true, minLevel: 5, gridSize: 80,
-            calculator: function(size) {
-              // 클러스터 내 위험 비율로 스타일 결정
-              if (size >= 50) return 3;
-              if (size >= 20) return 2;
-              if (size >= 5) return 1;
-              return 0;
-            },
-            styles: [
-              {width:'36px',height:'36px',background:'rgba(5,150,105,.8)',borderRadius:'50%',color:'#fff',textAlign:'center',lineHeight:'36px',fontSize:'11px',fontWeight:'700',border:'2px solid rgba(255,255,255,.5)'},
-              {width:'44px',height:'44px',background:'rgba(0,102,204,.8)',borderRadius:'50%',color:'#fff',textAlign:'center',lineHeight:'44px',fontSize:'12px',fontWeight:'700',border:'2px solid rgba(255,255,255,.5)'},
-              {width:'52px',height:'52px',background:'rgba(217,119,6,.85)',borderRadius:'50%',color:'#fff',textAlign:'center',lineHeight:'52px',fontSize:'13px',fontWeight:'700',border:'2px solid rgba(255,255,255,.5)'},
-              {width:'60px',height:'60px',background:'rgba(220,38,38,.9)',borderRadius:'50%',color:'#fff',textAlign:'center',lineHeight:'60px',fontSize:'14px',fontWeight:'700',border:'2px solid rgba(255,255,255,.5)'}
-            ]
-          });
           mapInitMarkerImages();
           _mapInitedFlag = true;
-          console.log('mapInitKakao: COMPLETE, _mapObj=', !!_mapObj, '_mapClusterer=', !!_mapClusterer);
           resolve();
         });
-      } catch(e) {
-        console.error('mapInitKakao ERROR:', e);
-        resolve();
-      }
+      } catch(e) { resolve(); }
     }
     tryInit();
   });
@@ -7468,10 +7445,7 @@ function mapLoadExcel(input) {
     mapBuildSidoFilters();
     mapUpdateStats();
     mapBuildRegionDashboard();
-    // 지도 초기화 완료 후 렌더링
-    console.log('mapLoadExcel: calling mapInitKakao().then(mapRenderMarkers)');
     mapInitKakao().then(function() {
-      console.log('mapInitKakao resolved, _mapObj=', !!_mapObj, '_mapClusterer=', !!_mapClusterer);
       mapRenderMarkers();
     });
   };
@@ -7553,7 +7527,7 @@ function mapRenderMarkers() {
   if (!_mapObj) return;
   _mapMarkers.forEach(function(m) { m.setMap(null); });
   _mapMarkers = [];
-  if (_mapClusterer) _mapClusterer.clear();
+  _clearBubbles();
 
   var cached = localStorage.getItem('mapGeoCache');
   if (cached) try { _mapGeoCache = JSON.parse(cached); } catch(e) {}
@@ -7594,10 +7568,10 @@ function mapRenderMarkers() {
 
   function finishRender() {
     _mapReady = true;
+    mapBuildBubbleAgg();
     mapShowLoading('완료!', _mapData.length + '개 건물', 100);
     setTimeout(mapHideLoading, 1000);
     document.getElementById('mapDataCount').textContent = _mapData.length + '개 건물';
-    // 뷰포트 변경 시 마커 갱신
     kakao.maps.event.addListener(_mapObj, 'idle', mapUpdateViewport);
     mapUpdateViewport();
   }
@@ -7640,23 +7614,104 @@ function mapRenderMarkers() {
   }
 }
 
-// viewport 기반 마커 갱신
-var _markerPool = {}; // id → marker 재사용 풀
-var _currentVisibleIds = new Set();
+// ── 버블 집계 데이터 생성 (좌표 확정 후 1회) ──
+function mapBuildBubbleAgg() {
+  _bubbleSidoAgg = {}; _bubbleSggAgg = {}; _bubbleGuAgg = {};
+  var src = _mapSchools.length > 0 ? _mapSchools : _mapData;
+  src.forEach(function(d) {
+    if (!d.lat || !d.lng) return;
+    var sido = d.sido || '미분류';
+    var sgg = mapParseSigungu(d.address) || '기타';
+    var addr = String(d.address || '').trim().split(/\s+/);
+    var gu = addr.length >= 3 ? addr[2] : sgg;
+    var isDanger = d.gradeInfo && (d.gradeInfo.key === 'danger' || d.gradeInfo.key === 'warning');
 
-function mapUpdateViewport() {
-  if (!_mapObj || !_mapReady) return;
-  if (_mapViewTimer) clearTimeout(_mapViewTimer);
-  _mapViewTimer = setTimeout(_doUpdateViewport, 300);
+    // 시도
+    if (!_bubbleSidoAgg[sido]) _bubbleSidoAgg[sido] = { lats:[], lngs:[], total:0, danger:0, schools:new Set() };
+    var sa = _bubbleSidoAgg[sido];
+    sa.lats.push(d.lat); sa.lngs.push(d.lng); sa.total++; if (isDanger) sa.danger++;
+    sa.schools.add(d.school);
+
+    // 시군구
+    var sggKey = sido + '|' + sgg;
+    if (!_bubbleSggAgg[sggKey]) _bubbleSggAgg[sggKey] = { lats:[], lngs:[], total:0, danger:0, schools:new Set(), sido:sido, name:sgg };
+    var sga = _bubbleSggAgg[sggKey];
+    sga.lats.push(d.lat); sga.lngs.push(d.lng); sga.total++; if (isDanger) sga.danger++;
+    sga.schools.add(d.school);
+
+    // 구/동
+    var guKey = sido + '|' + sgg + '|' + gu;
+    if (!_bubbleGuAgg[guKey]) _bubbleGuAgg[guKey] = { lats:[], lngs:[], total:0, danger:0, schools:new Set(), sido:sido, name:gu };
+    var ga = _bubbleGuAgg[guKey];
+    ga.lats.push(d.lat); ga.lngs.push(d.lng); ga.total++; if (isDanger) ga.danger++;
+    ga.schools.add(d.school);
+  });
+  // 좌표 평균 계산
+  function avg(arr) { return arr.reduce(function(a,b){return a+b;},0)/arr.length; }
+  function finalize(agg) {
+    for (var k in agg) { var a=agg[k]; a.lat=avg(a.lats); a.lng=avg(a.lngs); delete a.lats; delete a.lngs; }
+  }
+  finalize(_bubbleSidoAgg); finalize(_bubbleSggAgg); finalize(_bubbleGuAgg);
 }
 
-function _doUpdateViewport() {
+// ── 버블 렌더링 ──
+function _clearBubbles() {
+  _currentBubbles.forEach(function(o) { o.setMap(null); });
+  _currentBubbles = [];
+}
+
+function _createBubble(name, total, danger, lat, lng, clickZoom) {
+  var pct = total > 0 ? danger / total : 0;
+  var color = pct >= 0.1 ? '#dc2626' : pct >= 0.07 ? '#d97706' : pct >= 0.03 ? '#0066cc' : '#059669';
+  var size = Math.max(40, Math.min(80, 30 + Math.sqrt(total) * 3));
+
+  var el = document.createElement('div');
+  el.style.cssText = 'width:'+size+'px;height:'+size+'px;border-radius:50%;background:'+color+
+    ';color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;'+
+    'box-shadow:0 2px 8px rgba(0,0,0,.3);font-family:Pretendard,sans-serif;border:2px solid rgba(255,255,255,.5);'+
+    'transition:transform .15s;user-select:none;';
+  el.innerHTML = '<div style="font-size:'+(size>55?'12':'11')+'px;font-weight:700;line-height:1.2;">'+name+'</div>'+
+    '<div style="font-size:'+(size>55?'10':'9')+'px;opacity:.9;line-height:1;">'+danger+'/'+total+'</div>';
+  el.onmouseenter = function(){ el.style.transform='scale(1.12)'; };
+  el.onmouseleave = function(){ el.style.transform='none'; };
+  el.onclick = function(){
+    _mapObj.setCenter(new kakao.maps.LatLng(lat, lng));
+    _mapObj.setLevel(clickZoom);
+  };
+
+  var overlay = new kakao.maps.CustomOverlay({
+    position: new kakao.maps.LatLng(lat, lng),
+    content: el,
+    yAnchor: 0.5, xAnchor: 0.5
+  });
+  return overlay;
+}
+
+function _renderBubbles(agg, clickZoom) {
   var bounds = _mapObj.getBounds();
   var sw = bounds.getSouthWest(), ne = bounds.getNorthEast();
   var sLat = sw.getLat(), sLng = sw.getLng(), nLat = ne.getLat(), nLng = ne.getLng();
-  var zoom = _mapObj.getLevel();
+  // 필터 수집
+  var filters = _collectFilters();
 
-  // 필터 수집 (1회만)
+  for (var k in agg) {
+    var a = agg[k];
+    // 시도 필터
+    var sido = a.sido || k;
+    if (!filters.allSido && !filters.sidoFilter[sido]) continue;
+    // 뷰포트 (시도 버블은 항상 표시)
+    if (clickZoom < 11) {
+      if (a.lat < sLat || a.lat > nLat || a.lng < sLng || a.lng > nLng) continue;
+    }
+    var name = a.name || k;
+    if (name.length > 5) name = name.substring(0, 5);
+    var bubble = _createBubble(name, a.schools.size, a.danger, a.lat, a.lng, clickZoom);
+    bubble.setMap(_mapObj);
+    _currentBubbles.push(bubble);
+  }
+}
+
+function _collectFilters() {
   var gradeFilter = {};
   document.querySelectorAll('#tab-map input[data-grade]').forEach(function(cb) {
     gradeFilter[cb.dataset.grade] = cb.checked;
@@ -7668,45 +7723,109 @@ function _doUpdateViewport() {
   var allSido = Object.values(sidoFilter).every(function(v) { return !v; });
   var minElapsed = parseInt(document.getElementById('mapYearSlider').value) || 0;
   document.getElementById('mapYearVal').textContent = minElapsed + '년+';
-  var curYear = new Date().getFullYear();
+  return { gradeFilter: gradeFilter, sidoFilter: sidoFilter, allSido: allSido, minElapsed: minElapsed };
+}
 
-  // 뷰포트 + 필터 → 새 ID Set
+// viewport 기반 버블/마커 갱신
+var _markerPool = {};
+var _currentVisibleIds = new Set();
+
+function mapUpdateViewport() {
+  if (!_mapObj || !_mapReady) return;
+  if (_mapViewTimer) clearTimeout(_mapViewTimer);
+  _mapViewTimer = setTimeout(_doUpdateViewport, 300);
+}
+
+function _doUpdateViewport() {
+  var zoom = _mapObj.getLevel();
+  var bounds = _mapObj.getBounds();
+  var sw = bounds.getSouthWest(), ne = bounds.getNorthEast();
+  var sLat = sw.getLat(), sLng = sw.getLng(), nLat = ne.getLat(), nLng = ne.getLng();
+
+  // 줌 레벨별 티어 결정 (kakao level: 높을수록 축소)
+  var tier;
+  if (zoom >= 10) tier = 'sido';
+  else if (zoom >= 7) tier = 'sgg';
+  else if (zoom >= 5) tier = 'gu';
+  else tier = 'marker';
+
+  // 버블 모드: 기존 마커 제거 후 버블 표시
+  if (tier !== 'marker') {
+    // 마커 숨기기
+    _mapMarkers.forEach(function(m) { m.setMap(null); });
+    _mapMarkers = [];
+    _currentVisibleIds = new Set();
+    _clearBubbles();
+
+    if (tier === 'sido') _renderBubbles(_bubbleSidoAgg, 8);
+    else if (tier === 'sgg') _renderBubbles(_bubbleSggAgg, 5);
+    else _renderBubbles(_bubbleGuAgg, 3);
+
+    _lastBubbleZoomTier = tier;
+    // 통계 업데이트 (전체 기준)
+    _updateStatsForBubbleMode(sLat, sLng, nLat, nLng, zoom);
+    return;
+  }
+
+  // 마커 모드 (zoom < 5): 버블 제거, 개별 마커 표시
+  _clearBubbles();
+  _lastBubbleZoomTier = 'marker';
+
+  var filters = _collectFilters();
+  var curYear = new Date().getFullYear();
   var newIds = new Set();
-  var MAX = zoom <= 8 ? 2000 : zoom <= 10 ? 5000 : 999999;
   var candidates = [];
   var src = _mapSchools.length > 0 ? _mapSchools : _mapData;
   for (var i = 0; i < src.length; i++) {
     var d = src[i];
     if (!d.lat || !d.lng) continue;
     if (d.lat < sLat || d.lat > nLat || d.lng < sLng || d.lng > nLng) continue;
-    if (!gradeFilter[d.gradeInfo.key]) continue;
-    if (!allSido && !sidoFilter[d.sido]) continue;
-    if (minElapsed > 0 && d.year && (curYear - d.year) < minElapsed) continue;
+    if (!filters.gradeFilter[d.gradeInfo.key]) continue;
+    if (!filters.allSido && !filters.sidoFilter[d.sido]) continue;
+    if (filters.minElapsed > 0 && d.year && (curYear - d.year) < filters.minElapsed) continue;
     candidates.push(d);
   }
-  if (candidates.length > MAX) {
+  if (candidates.length > 2000) {
     candidates.sort(function(a, b) { return (b.risk ? b.risk.total : 0) - (a.risk ? a.risk.total : 0); });
-    candidates = candidates.slice(0, MAX);
+    candidates = candidates.slice(0, 2000);
   }
   for (var j = 0; j < candidates.length; j++) newIds.add(candidates[j].id);
 
-  // 변경 없으면 스킵
   var changed = false;
   if (newIds.size !== _currentVisibleIds.size) changed = true;
   if (!changed) { newIds.forEach(function(id) { if (!_currentVisibleIds.has(id)) changed = true; }); }
   if (!changed) { mapUpdateStatsFromCandidates(candidates, sLat, sLng, nLat, nLng, zoom); return; }
 
-  // 클러스터러 갱신 — clear + addMarkers (안정적)
-  if (_mapClusterer) _mapClusterer.clear();
+  // 기존 마커 제거
+  _mapMarkers.forEach(function(m) { m.setMap(null); });
   _mapMarkers = [];
   for (var ci = 0; ci < candidates.length; ci++) {
     var cd = candidates[ci];
     var cm = _markerPool[cd.id];
     if (!cm) { cm = mapCreateMarker(cd); _markerPool[cd.id] = cm; }
+    cm.setMap(_mapObj);
     _mapMarkers.push(cm);
   }
-  if (_mapClusterer && _mapMarkers.length > 0) _mapClusterer.addMarkers(_mapMarkers);
   _currentVisibleIds = newIds;
+  mapUpdateStatsFromCandidates(candidates, sLat, sLng, nLat, nLng, zoom);
+}
+
+function _updateStatsForBubbleMode(sLat, sLng, nLat, nLng, zoom) {
+  var stats = { danger:0, warning:0, caution:0, good:0, unknown:0 };
+  var schools = new Set();
+  var src = _mapSchools.length > 0 ? _mapSchools : _mapData;
+  var filters = _collectFilters();
+  var curYear = new Date().getFullYear();
+  var candidates = [];
+  for (var i = 0; i < src.length; i++) {
+    var d = src[i];
+    if (!d.lat || !d.lng) continue;
+    if (d.lat < sLat || d.lat > nLat || d.lng < sLng || d.lng > nLng) continue;
+    if (!filters.gradeFilter[d.gradeInfo.key]) continue;
+    if (!filters.allSido && !filters.sidoFilter[d.sido]) continue;
+    if (filters.minElapsed > 0 && d.year && (curYear - d.year) < filters.minElapsed) continue;
+    candidates.push(d);
+  }
   mapUpdateStatsFromCandidates(candidates, sLat, sLng, nLat, nLng, zoom);
 }
 
@@ -8169,13 +8288,9 @@ function mapSetScoreMode(mode) {
       pm.setImage(_markerImages[pm._data.gradeInfo.key] || _markerImages.unknown);
     }
   }
-  // 클러스터러 재구성 (색상 반영)
-  if (_mapClusterer) {
-    _mapClusterer.clear();
-    var reMarkers = [];
-    _currentVisibleIds.forEach(function(id) { if (_markerPool[id]) reMarkers.push(_markerPool[id]); });
-    _mapClusterer.addMarkers(reMarkers);
-  }
+  mapBuildBubbleAgg();
+  _lastBubbleZoomTier = null;
+  mapUpdateViewport();
   mapBuildSidoFilters();
   mapUpdateStats();
   if (document.getElementById('mapSubView-region').style.display !== 'none') mapRegionView('sido');
@@ -8231,7 +8346,8 @@ function mapClearData() {
   _mapData = [];
   _mapMarkers.forEach(function(m) { m.setMap(null); });
   _mapMarkers = [];
-  if (_mapClusterer) _mapClusterer.clear();
+  _clearBubbles();
+  _bubbleSidoAgg = {}; _bubbleSggAgg = {}; _bubbleGuAgg = {};
   document.getElementById('mapEmptyMsg').style.display = '';
   document.getElementById('mapStatsContent').innerHTML = '<div style="color:#888;">데이터를 업로드하세요</div>';
   document.getElementById('mapDataCount').textContent = '';
