@@ -7598,10 +7598,9 @@ function _doUpdateViewport() {
     visibleData.push(d);
   }
 
-  // 줌 레벨별 최대 마커 수 제한 (축소 시 샘플링)
-  var MAX_MARKERS = 3000;
+  // 줌 레벨에 따라 마커 수 제한 (축소 시만 샘플링, 확대 시 전부 표시)
+  var MAX_MARKERS = zoom <= 8 ? 2000 : zoom <= 10 ? 5000 : 999999;
   if (visibleData.length > MAX_MARKERS) {
-    // 위험도 높은 순 정렬 후 상위 MAX_MARKERS개
     visibleData.sort(function(a, b) { return (b.risk ? b.risk.total : 0) - (a.risk ? a.risk.total : 0); });
     visibleData = visibleData.slice(0, MAX_MARKERS);
   }
@@ -7760,14 +7759,36 @@ function mapUpdateStatsForViewport() {
   var regionLabel = regionKeys.length <= 3 ? regionKeys.join(', ') : topRegion + ' 외 ' + (regionKeys.length - 1) + '개 지역';
 
   var el = document.getElementById('mapStatsContent');
-  el.innerHTML =
-    '<div style="font-size:12px;font-weight:700;margin-bottom:4px;color:#1d1d1f;">' + regionLabel + '</div>' +
+  var h = '<div style="font-size:12px;font-weight:700;margin-bottom:4px;color:#1d1d1f;">' + regionLabel + '</div>' +
     '<div>학교: <strong>' + schools.size + '교</strong> (' + visible + '동)</div>' +
     '<div style="color:#dc2626">🔴 위험: <strong>' + stats.danger + '</strong></div>' +
     '<div style="color:#d97706">🟠 경계: <strong>' + stats.warning + '</strong></div>' +
     '<div style="color:#0066cc">🔵 주의: <strong>' + stats.caution + '</strong></div>' +
     '<div style="color:#059669">🟢 양호: <strong>' + stats.good + '</strong></div>' +
     (stats.unknown ? '<div style="color:#7a7a7a">⚪ 미분류: <strong>' + stats.unknown + '</strong></div>' : '');
+
+  // 축소 시 (zoom >= 10) 시도별 요약 추가
+  var zoom = _mapObj.getLevel();
+  if (zoom >= 10 && regionKeys.length > 1) {
+    var sidoStats = {};
+    _mapData.forEach(function(d) {
+      if (!d.lat || !d.lng) return;
+      if (d.lat < sLat || d.lat > nLat || d.lng < sLng || d.lng > nLng) return;
+      if (!sidoStats[d.sido]) sidoStats[d.sido] = { total: 0, danger: 0, schools: new Set() };
+      sidoStats[d.sido].total++;
+      sidoStats[d.sido].schools.add(d.school);
+      if (d.gradeInfo.key === 'danger' || d.gradeInfo.key === 'warning') sidoStats[d.sido].danger++;
+    });
+    var sidoArr = Object.keys(sidoStats).sort(function(a,b){ return sidoStats[b].danger - sidoStats[a].danger; });
+    h += '<div style="border-top:1px solid #eee;margin-top:6px;padding-top:6px;font-size:10px;">';
+    sidoArr.slice(0, 8).forEach(function(s) {
+      var st = sidoStats[s];
+      var clr = st.danger > 0 ? '#dc2626' : '#059669';
+      h += '<div style="display:flex;justify-content:space-between;"><span>' + s + ' ' + st.schools.size + '교</span><span style="color:'+clr+';font-weight:600;">위험 ' + st.danger + '</span></div>';
+    });
+    h += '</div>';
+  }
+  el.innerHTML = h;
 }
 
 function mapSwitchSub(view) {
