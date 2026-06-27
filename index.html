@@ -7276,6 +7276,7 @@ var _mapInitedFlag = false;
 var _mapObj = null;
 var _mapClusterer = null;
 var _mapData = [];
+var _mapSchools = [];
 var _mapMarkers = [];
 var _mapGeoCache = {};
 var _mapInitPromise = null;
@@ -7440,7 +7441,24 @@ function mapLoadExcel(input) {
       };
     }).filter(function(d) { return d.school || d.address; });
 
-    mapShowLoading('데이터 파싱 완료', _mapData.length + '건 로드, 지도 초기화 중...', 10);
+    // 학교별 대표 동 추출 (최고 위험도 동, 클릭 시 전체 동 목록)
+    var schoolGroup = {};
+    _mapData.forEach(function(d) {
+      var key = d.school + '|' + d.address;
+      if (!schoolGroup[key]) schoolGroup[key] = [];
+      schoolGroup[key].push(d);
+    });
+    _mapSchools = [];
+    for (var sk in schoolGroup) {
+      var group = schoolGroup[sk];
+      group.sort(function(a, b) { return (b.risk ? b.risk.total : 0) - (a.risk ? a.risk.total : 0); });
+      var rep = group[0];
+      rep._allBuildings = group;
+      rep._buildingCount = group.length;
+      _mapSchools.push(rep);
+    }
+
+    mapShowLoading('데이터 파싱 완료', _mapData.length + '건 → ' + _mapSchools.length + '교 로드', 10);
     document.getElementById('mapEmptyMsg').style.display = 'none';
     mapBuildSidoFilters();
     mapUpdateStats();
@@ -7495,18 +7513,29 @@ function mapCreateMarker(d) {
     var elapsed = d.year ? (new Date().getFullYear() - parseInt(d.year)) : '-';
     var riskBar = d.risk ? ('<div style="background:#eee;border-radius:4px;height:6px;margin-top:4px;">' +
       '<div style="width:' + (d.risk.total * 10) + '%;height:100%;background:' + color + ';border-radius:4px;"></div></div>') : '';
-    _globalInfoWindow.setContent(
-      '<div style="padding:10px 14px;min-width:200px;font-family:Pretendard,sans-serif;">' +
-      '<div style="font-size:13px;font-weight:700;margin-bottom:4px;">' + d.school + (d.building ? ' ' + d.building : '') + '</div>' +
-      '<div style="font-size:11px;color:#555;margin-bottom:6px;">' + d.address + '</div>' +
-      '<div style="display:flex;gap:12px;font-size:11px;">' +
-        '<span>안전등급: <strong>' + (d.grade || '-') + '</strong></span>' +
-        '<span>준공: <strong>' + (d.year || '-') + '</strong></span>' +
-        '<span>경과: <strong>' + elapsed + '년</strong></span>' +
-      '</div>' +
-      '<div style="margin-top:6px;font-size:11px;">위험도: <strong style="color:' + color + ';">' +
-        (d.risk ? d.risk.total + '점 (' + d.gradeInfo.label + ')' : '미분류') + '</strong>' + riskBar + '</div></div>'
-    );
+    var iwHtml = '<div style="padding:10px 14px;min-width:220px;max-width:320px;font-family:Pretendard,sans-serif;">' +
+      '<div style="font-size:14px;font-weight:700;margin-bottom:2px;">' + d.school + '</div>' +
+      '<div style="font-size:11px;color:#555;margin-bottom:6px;">' + d.address + '</div>';
+    // 전체 동 목록
+    var buildings = d._allBuildings || [d];
+    if (buildings.length > 1) {
+      iwHtml += '<div style="font-size:10px;font-weight:600;color:#888;margin-bottom:4px;">' + buildings.length + '개 동</div>';
+    }
+    iwHtml += '<div style="max-height:150px;overflow-y:auto;">';
+    buildings.forEach(function(b) {
+      var bc = b.gradeInfo.color;
+      var be = b.year ? (new Date().getFullYear() - parseInt(b.year)) + '년' : '-';
+      iwHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid #f0f0f0;font-size:11px;">' +
+        '<span>' + (b.building || '본관') + '</span>' +
+        '<span style="display:flex;gap:6px;align-items:center;">' +
+          '<span>' + (b.grade || '-') + '</span>' +
+          '<span>' + (b.year || '-') + '</span>' +
+          '<span style="background:' + bc + ';color:#fff;padding:1px 6px;border-radius:9999px;font-size:9px;font-weight:700;">' +
+            (b.risk ? b.risk.total + '점' : '-') + '</span>' +
+        '</span></div>';
+    });
+    iwHtml += '</div></div>';
+    _globalInfoWindow.setContent(iwHtml);
     _globalInfoWindow.open(_mapObj, marker);
   });
   return marker;
@@ -7640,8 +7669,9 @@ function _doUpdateViewport() {
   var newIds = new Set();
   var MAX = zoom <= 8 ? 2000 : zoom <= 10 ? 5000 : 999999;
   var candidates = [];
-  for (var i = 0; i < _mapData.length; i++) {
-    var d = _mapData[i];
+  var src = _mapSchools.length > 0 ? _mapSchools : _mapData;
+  for (var i = 0; i < src.length; i++) {
+    var d = src[i];
     if (!d.lat || !d.lng) continue;
     if (d.lat < sLat || d.lat > nLat || d.lng < sLng || d.lng > nLng) continue;
     if (!gradeFilter[d.gradeInfo.key]) continue;
