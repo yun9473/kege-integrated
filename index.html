@@ -4390,11 +4390,15 @@ async function emailDoSend(targets,subject,body,dday){
     var bd=body.replace(/\{day\}/g,Math.abs(d)).replace(/\{school\}/g,s?s.school:'').replace(/\{deadline\}/g,deadlineStr).replace(/\{building\}/g,s?s.building:'');
 
     try{
-      await fetch(paUrl,{
+      var res = await fetch(paUrl,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({action:'sendEmail',to:item.email,subject:subj,body:bd,school:s?s.school:''})
+        body:JSON.stringify({action:'sendEmail',to:item.email,subject:subj,body:bd,school:s?s.school:'',fileName:'email',folderPath:'email',fileContent:''})
       });
+      if(!res.ok){
+        var errText = await res.text().catch(function(){return '';});
+        throw new Error('HTTP '+res.status+' '+(errText||'').substring(0,100));
+      }
       sent++;
       var now=new Date().toLocaleTimeString('ko-KR');
       logEl.innerHTML='<div style="color:#059669;">✅ ['+now+'] '+item.email+' → '+(s?s.school:'')+' 발송 완료</div>'+logEl.innerHTML;
