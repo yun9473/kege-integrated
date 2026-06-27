@@ -7685,6 +7685,74 @@ function _clearBubbles() {
   _currentBubbles = [];
 }
 
+// ── 시도 경계 폴리곤 ──
+var _sidoBoundaryData = null;
+var _sidoPolygons = [];
+var _sidoHighlightName = null;
+
+function _loadSidoBoundaries() {
+  if (_sidoBoundaryData) return Promise.resolve(_sidoBoundaryData);
+  return fetch('data/sido-boundaries.json').then(function(r){ return r.json(); }).then(function(geo){
+    _sidoBoundaryData = geo;
+    return geo;
+  }).catch(function(){ _sidoBoundaryData = null; return null; });
+}
+
+function _clearSidoPolygons() {
+  _sidoPolygons.forEach(function(p){ p.setMap(null); });
+  _sidoPolygons = [];
+  _sidoHighlightName = null;
+}
+
+function mapHighlightSido(sidoName) {
+  _clearSidoPolygons();
+  if (!sidoName) return;
+  _sidoHighlightName = sidoName;
+
+  _loadSidoBoundaries().then(function(geo) {
+    if (!geo || !_mapObj) return;
+    var feat = geo.features.find(function(f){ return f.properties.name === sidoName; });
+    if (!feat) return;
+
+    var geom = feat.geometry;
+    var polygons = [];
+    if (geom.type === 'Polygon') {
+      polygons.push(geom.coordinates);
+    } else if (geom.type === 'MultiPolygon') {
+      polygons = geom.coordinates;
+    }
+
+    polygons.forEach(function(poly) {
+      var path = poly[0].map(function(c){ return new kakao.maps.LatLng(c[1], c[0]); });
+      var polygon = new kakao.maps.Polygon({
+        map: _mapObj,
+        path: path,
+        strokeWeight: 3,
+        strokeColor: '#0066cc',
+        strokeOpacity: 0.8,
+        fillColor: '#0066cc',
+        fillOpacity: 0.08
+      });
+      _sidoPolygons.push(polygon);
+
+      // 내부 홀(섬 제외 등)
+      for (var h = 1; h < poly.length; h++) {
+        var holePath = poly[h].map(function(c){ return new kakao.maps.LatLng(c[1], c[0]); });
+        var hole = new kakao.maps.Polygon({
+          map: _mapObj,
+          path: holePath,
+          strokeWeight: 1,
+          strokeColor: '#0066cc',
+          strokeOpacity: 0.3,
+          fillColor: '#ffffff',
+          fillOpacity: 0.5
+        });
+        _sidoPolygons.push(hole);
+      }
+    });
+  });
+}
+
 function _createBubble(name, total, danger, lat, lng, clickData) {
   var pct = total > 0 ? danger / total : 0;
   var color = pct >= 0.1 ? '#dc2626' : pct >= 0.07 ? '#d97706' : pct >= 0.03 ? '#0066cc' : '#059669';
@@ -7702,6 +7770,9 @@ function _createBubble(name, total, danger, lat, lng, clickData) {
   el.onmouseenter = function(){ el.style.transform='scale(1.12)'; };
   el.onmouseleave = function(){ el.style.transform='none'; };
   el.onclick = function(){
+    if (clickData && clickData.sido) {
+      mapHighlightSido(clickData.sido);
+    }
     if (clickData && clickData.bounds) {
       _mapObj.setBounds(clickData.bounds, 60);
     } else if (clickData && clickData.zoom) {
@@ -7801,7 +7872,7 @@ function _renderBubbles(agg, tier) {
     var clickData;
     if (tier === 'sido') {
       var sidoBounds = _getSidoBounds(k);
-      clickData = sidoBounds ? { bounds: sidoBounds } : { zoom: 8 };
+      clickData = sidoBounds ? { bounds: sidoBounds, sido: k } : { zoom: 8, sido: k };
     } else if (tier === 'sgg') {
       clickData = { zoom: 6 };
     }
@@ -7862,6 +7933,7 @@ function _doUpdateViewport() {
     _mapMarkers = [];
     _currentVisibleIds = new Set();
     _clearBubbles();
+    if (tier === 'sido') _clearSidoPolygons();
 
     if (tier === 'sido') _renderBubbles(_bubbleSidoAgg, 'sido');
     else _renderBubbles(_bubbleSggAgg, 'sgg');
