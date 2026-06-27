@@ -7269,10 +7269,16 @@ function mapGetGrade(score) {
 function mapParseSido(address) {
   if (!address) return '미분류';
   var s = String(address).trim();
-  var patterns = ['서울','부산','대구','인천','광주','대전','울산','세종',
-    '경기','강원','충북','충남','전북','전남','경북','경남','제주'];
-  for (var i = 0; i < patterns.length; i++) {
-    if (s.startsWith(patterns[i])) return patterns[i];
+  var map = [
+    ['서울'],['부산'],['대구'],['인천'],['광주'],['대전'],['울산'],['세종'],
+    ['경기'],['강원특별자치도','강원'],['충청북도','충북'],['충청남도','충남'],
+    ['전라북도','전북특별자치도','전북'],['전라남도','전남'],
+    ['경상북도','경북'],['경상남도','경남'],['제주특별자치도','제주']
+  ];
+  for (var i = 0; i < map.length; i++) {
+    for (var j = 0; j < map[i].length; j++) {
+      if (s.startsWith(map[i][j])) return map[i][map[i].length - 1];
+    }
   }
   return '기타';
 }
@@ -7663,11 +7669,17 @@ function mapBuildSidoFilters() {
 }
 
 function mapUpdateStats() {
-  var stats = { total: _mapData.length, danger: 0, warning: 0, caution: 0, good: 0, unknown: 0 };
-  _mapData.forEach(function(d) { stats[d.gradeInfo.key] = (stats[d.gradeInfo.key] || 0) + 1; });
+  var stats = { total: 0, danger: 0, warning: 0, caution: 0, good: 0, unknown: 0 };
+  var schoolSet = new Set();
+  _mapData.forEach(function(d) {
+    stats[d.gradeInfo.key] = (stats[d.gradeInfo.key] || 0) + 1;
+    schoolSet.add(d.school);
+  });
+  stats.total = _mapData.length;
+  var schoolCount = schoolSet.size;
   var el = document.getElementById('mapStatsContent');
   el.innerHTML =
-    '<div>총 건물: <strong>' + stats.total + '동</strong></div>' +
+    '<div>총 학교: <strong>' + schoolCount + '교</strong> (' + stats.total + '동)</div>' +
     '<div style="color:#dc2626">🔴 위험: <strong>' + stats.danger + '동</strong></div>' +
     '<div style="color:#d97706">🟠 경계: <strong>' + stats.warning + '동</strong></div>' +
     '<div style="color:#0066cc">🔵 주의: <strong>' + stats.caution + '동</strong></div>' +
