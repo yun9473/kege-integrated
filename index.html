@@ -2094,11 +2094,19 @@ table.dtable tbody tr{cursor:pointer;}
         <div style="font-size:12px;font-weight:700;margin-bottom:8px;color:#1d1d1f;">📊 현황 요약</div>
         <div id="mapStatsContent" style="font-size:11px;color:#333;line-height:1.8;"></div>
       </div>
+      <!-- 드래그앤드롭 오버레이 -->
+      <div id="mapDropOverlay" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,102,204,0.12);border:3px dashed var(--blue);z-index:30;pointer-events:none;align-items:center;justify-content:center;">
+        <div style="background:#fff;border-radius:16px;padding:24px 40px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,0.1);">
+          <div style="font-size:36px;margin-bottom:8px;">📂</div>
+          <div style="font-size:15px;font-weight:700;color:var(--blue);">여기에 파일을 놓으세요</div>
+          <div style="font-size:12px;color:#555;margin-top:4px;">.xlsx / .csv</div>
+        </div>
+      </div>
       <!-- 엑셀 미업로드 시 안내 -->
       <div id="mapEmptyMsg" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;color:#7a7a7a;pointer-events:none;">
         <div style="font-size:36px;margin-bottom:12px;">📂</div>
-        <div style="font-size:15px;font-weight:600;">엑셀 파일을 업로드하세요</div>
-        <div style="font-size:12px;margin-top:6px;">학교명 / 주소 / 안전등급 / 준공연도<br>컬럼이 포함된 .xlsx 파일</div>
+        <div style="font-size:15px;font-weight:600;">엑셀 파일을 업로드하거나 드래그하세요</div>
+        <div style="font-size:12px;margin-top:6px;">학교명 / 주소 / 안전등급 / 준공연도<br>컬럼이 포함된 .xlsx / .csv 파일</div>
       </div>
     </div>
   </div>
@@ -7549,6 +7557,28 @@ function mapClearData() {
   document.getElementById('mapSidoFilters').innerHTML = '';
   document.getElementById('mapExcelFile').value = '';
 }
+
+// 드래그앤드롭
+(function(){
+  var mapArea = null;
+  var dropOverlay = null;
+  var dragCounter = 0;
+  function initDrop() {
+    mapArea = document.querySelector('#tab-map .main') || document.getElementById('tab-map');
+    dropOverlay = document.getElementById('mapDropOverlay');
+    if (!mapArea || !dropOverlay) return;
+    mapArea.addEventListener('dragenter', function(e) { e.preventDefault(); dragCounter++; dropOverlay.style.display='flex'; });
+    mapArea.addEventListener('dragleave', function(e) { e.preventDefault(); dragCounter--; if(dragCounter<=0){dragCounter=0;dropOverlay.style.display='none';} });
+    mapArea.addEventListener('dragover', function(e) { e.preventDefault(); });
+    mapArea.addEventListener('drop', function(e) {
+      e.preventDefault(); dragCounter=0; dropOverlay.style.display='none';
+      var files = e.dataTransfer.files;
+      if(files.length>0) { document.getElementById('mapExcelFile').files = files; mapLoadExcel(document.getElementById('mapExcelFile')); }
+    });
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',initDrop);
+  else setTimeout(initDrop, 500);
+})();
 
 function mapShowLoading(title, detail, pct) {
   var el = document.getElementById('mapLoadingOverlay');
