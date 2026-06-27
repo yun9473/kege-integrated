@@ -2037,6 +2037,10 @@ table.dtable tbody tr{cursor:pointer;}
       <button id="mapSubTab-region" class="map-subtab" onclick="mapSwitchSub('region')">📊 지역별 비교</button>
     </div>
     <div style="margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div style="position:relative;">
+        <input type="text" id="mapSearchInput" placeholder="🔍 학교명 검색" autocomplete="off" oninput="mapSearchSchools(this.value)" onfocus="mapSearchSchools(this.value)" style="width:200px;padding:7px 12px;border:1px solid #e0e0e0;border-radius:9999px;font-size:12px;font-family:inherit;outline:none;">
+        <div id="mapSearchResults" style="display:none;position:absolute;top:38px;left:0;width:280px;max-height:320px;overflow-y:auto;background:#fff;border:1px solid #e0e0e0;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.15);z-index:40;"></div>
+      </div>
       <label class="map-upload-btn" style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;background:var(--blue);color:#fff;border-radius:9999px;font-size:12px;font-weight:600;cursor:pointer;">
         📂 엑셀 업로드
         <input type="file" id="mapExcelFile" accept=".xlsx,.xls,.csv" style="display:none;" onchange="mapLoadExcel(this)"/>
@@ -2123,6 +2127,14 @@ table.dtable tbody tr{cursor:pointer;}
       <div id="mapStatsOverlay" style="position:absolute;top:12px;right:12px;background:rgba(255,255,255,0.97);border-radius:12px;padding:14px 18px;box-shadow:0 2px 8px rgba(0,0,0,0.12);min-width:200px;z-index:10;">
         <div style="font-size:12px;font-weight:700;margin-bottom:8px;color:#1d1d1f;">📊 현황 요약</div>
         <div id="mapStatsContent" style="font-size:11px;color:#333;line-height:1.8;"></div>
+      </div>
+      <!-- 학교 목록 패널 (범례/시군구 클릭 시) -->
+      <div id="mapSchoolListPanel" style="display:none;position:absolute;top:12px;right:12px;width:300px;max-height:calc(100% - 24px);background:#fff;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.18);z-index:15;flex-direction:column;overflow:hidden;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid #eee;flex-shrink:0;">
+          <div id="mapSchoolListTitle" style="font-size:13px;font-weight:700;color:#1d1d1f;">학교 목록</div>
+          <button onclick="mapCloseSchoolList()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#999;line-height:1;">×</button>
+        </div>
+        <div id="mapSchoolListBody" style="overflow-y:auto;padding:6px 0;"></div>
       </div>
       <!-- 지도 컨트롤 버튼 -->
       <div style="position:absolute;top:50px;left:12px;z-index:5;display:flex;flex-direction:column;gap:4px;">
@@ -7507,15 +7519,21 @@ function mapCreateMarker(d) {
     if (buildings.length > 1) {
       iwHtml += '<div style="font-size:10px;font-weight:600;color:#888;margin-bottom:4px;">' + buildings.length + '개 동</div>';
     }
-    iwHtml += '<div style="max-height:150px;overflow-y:auto;">';
+    iwHtml += '<div style="display:flex;font-size:9px;color:#aaa;padding:2px 0;border-bottom:1px solid #eee;font-weight:600;">' +
+      '<span style="flex:1;">동</span><span style="width:32px;text-align:center;">등급</span>' +
+      '<span style="width:42px;text-align:center;">준공</span><span style="width:90px;text-align:center;">위험도(안전+경과)</span></div>';
+    iwHtml += '<div style="max-height:170px;overflow-y:auto;">';
     buildings.forEach(function(b) {
       var bc = b.gradeInfo.color;
       var be = b.year ? (new Date().getFullYear() - parseInt(b.year)) + '년' : '-';
-      iwHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid #f0f0f0;font-size:11px;">' +
-        '<span>' + (b.building || '본관') + '</span>' +
-        '<span style="display:flex;gap:6px;align-items:center;">' +
-          '<span>' + (b.grade || '-') + '</span>' +
-          '<span>' + (b.year || '-') + '</span>' +
+      var sScore = b.risk ? b.risk.safety : 0;
+      var aScore = b.risk ? b.risk.age : 0;
+      iwHtml += '<div style="display:flex;align-items:center;padding:3px 0;border-bottom:1px solid #f0f0f0;font-size:11px;">' +
+        '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (b.building || '본관') + '</span>' +
+        '<span style="width:32px;text-align:center;">' + (b.grade || '-') + '</span>' +
+        '<span style="width:42px;text-align:center;color:#666;">' + (b.year || '-') + '</span>' +
+        '<span style="width:90px;display:flex;align-items:center;justify-content:flex-end;gap:4px;">' +
+          '<span style="font-size:9px;color:#888;">안' + sScore + '+경' + aScore + '</span>' +
           '<span style="background:' + bc + ';color:#fff;padding:1px 6px;border-radius:9999px;font-size:9px;font-weight:700;">' +
             (b.risk ? b.risk.total + '점' : '-') + '</span>' +
         '</span></div>';
@@ -7677,8 +7695,10 @@ function _createBubble(name, total, danger, lat, lng, clickData) {
     ';color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;'+
     'box-shadow:0 2px 8px rgba(0,0,0,.3);font-family:Pretendard,sans-serif;border:2px solid rgba(255,255,255,.5);'+
     'transition:transform .15s;user-select:none;';
+  var pctStr = (pct*100).toFixed(1) + '%';
   el.innerHTML = '<div style="font-size:'+(size>55?'12':'11')+'px;font-weight:700;line-height:1.2;">'+name+'</div>'+
-    '<div style="font-size:'+(size>55?'10':'9')+'px;opacity:.9;line-height:1;">'+danger+'/'+total+'</div>';
+    '<div style="font-size:'+(size>55?'10':'9')+'px;opacity:.9;line-height:1;">'+danger+'/'+total+'</div>'+
+    '<div style="font-size:'+(size>55?'9':'8')+'px;opacity:.85;line-height:1.1;">('+pctStr+')</div>';
   el.onmouseenter = function(){ el.style.transform='scale(1.12)'; };
   el.onmouseleave = function(){ el.style.transform='none'; };
   el.onclick = function(){
@@ -7877,6 +7897,8 @@ function _doUpdateViewport() {
   for (var j = 0; j < candidates.length; j++) newIds.add(candidates[j].id);
 
   var changed = false;
+  // 버블→마커 전환 직후엔 마커가 비어 있으므로 강제 재렌더
+  if (_lastBubbleZoomTier !== 'marker' || _mapMarkers.length === 0) changed = true;
   if (newIds.size !== _currentVisibleIds.size) changed = true;
   if (!changed) { newIds.forEach(function(id) { if (!_currentVisibleIds.has(id)) changed = true; }); }
   if (!changed) { mapUpdateStatsFromCandidates(candidates, sLat, sLng, nLat, nLng, zoom); return; }
@@ -7915,6 +7937,7 @@ function _updateStatsForBubbleMode(sLat, sLng, nLat, nLng, zoom) {
 }
 
 function mapUpdateStatsFromCandidates(candidates, sLat, sLng, nLat, nLng, zoom) {
+  _mapLastCandidates = candidates;
   var stats = { danger:0, warning:0, caution:0, good:0, unknown:0 };
   var schools = new Set();
   var regionCounts = {};
@@ -7934,11 +7957,11 @@ function mapUpdateStatsFromCandidates(candidates, sLat, sLng, nLat, nLng, zoom) 
   var el = document.getElementById('mapStatsContent');
   var h = '<div style="font-size:12px;font-weight:700;margin-bottom:4px;color:#1d1d1f;">' + regionLabel + '</div>' +
     '<div>학교: <strong>' + schools.size + '교</strong> (' + visible + '동)</div>' +
-    '<div style="color:#dc2626">🔴 위험: <strong>' + stats.danger + '</strong></div>' +
-    '<div style="color:#d97706">🟠 경계: <strong>' + stats.warning + '</strong></div>' +
-    '<div style="color:#0066cc">🔵 주의: <strong>' + stats.caution + '</strong></div>' +
-    '<div style="color:#059669">🟢 양호: <strong>' + stats.good + '</strong></div>' +
-    (stats.unknown ? '<div style="color:#7a7a7a">⚪ 미분류: <strong>' + stats.unknown + '</strong></div>' : '');
+    '<div style="color:#dc2626;cursor:pointer;" onclick="mapShowSchoolListByGrade(\'danger\',\'🔴 위험\')">🔴 위험: <strong>' + stats.danger + '</strong> ›</div>' +
+    '<div style="color:#d97706;cursor:pointer;" onclick="mapShowSchoolListByGrade(\'warning\',\'🟠 경계\')">🟠 경계: <strong>' + stats.warning + '</strong> ›</div>' +
+    '<div style="color:#0066cc;cursor:pointer;" onclick="mapShowSchoolListByGrade(\'caution\',\'🔵 주의\')">🔵 주의: <strong>' + stats.caution + '</strong> ›</div>' +
+    '<div style="color:#059669;cursor:pointer;" onclick="mapShowSchoolListByGrade(\'good\',\'🟢 양호\')">🟢 양호: <strong>' + stats.good + '</strong> ›</div>' +
+    (stats.unknown ? '<div style="color:#7a7a7a;cursor:pointer;" onclick="mapShowSchoolListByGrade(\'unknown\',\'⚪ 미분류\')">⚪ 미분류: <strong>' + stats.unknown + '</strong> ›</div>' : '');
   if (zoom >= 10 && regionKeys.length > 1) {
     var sidoStats = {};
     for (var si = 0; si < candidates.length; si++) {
@@ -7979,18 +8002,20 @@ function mapParseSigungu(address) {
 function mapBuildSidoFilters() {
   // 시도 → 시군구 → { total, danger } 집계
   var sidoMap = {};
-  _mapData.forEach(function(d) {
+  var _filterSrc = _mapSchools.length > 0 ? _mapSchools : _mapData;
+  _filterSrc.forEach(function(d) {
+    var isDanger = (d.gradeInfo.key === 'danger' || d.gradeInfo.key === 'warning');
     if (!sidoMap[d.sido]) sidoMap[d.sido] = { total: 0, danger: 0, schools: new Set(), sgg: {} };
     var sm = sidoMap[d.sido];
     sm.total++;
     sm.schools.add(d.school);
-    if (d.gradeInfo.key === 'danger' || d.gradeInfo.key === 'warning') sm.danger++;
+    if (isDanger) sm.danger++;
 
     var sgg = mapParseSigungu(d.address) || '기타';
     if (!sm.sgg[sgg]) sm.sgg[sgg] = { total: 0, danger: 0, schools: new Set() };
     sm.sgg[sgg].total++;
     sm.sgg[sgg].schools.add(d.school);
-    if (d.gradeInfo.key === 'danger' || d.gradeInfo.key === 'warning') sm.sgg[sgg].danger++;
+    if (isDanger) sm.sgg[sgg].danger++;
   });
 
   var el = document.getElementById('mapSidoFilters');
@@ -8028,8 +8053,13 @@ function mapBuildSidoFilters() {
       var dangerSchools = sg.danger;
       var totalSchools = sg.schools.size;
       var item = document.createElement('div');
-      item.style.cssText = 'font-size:11px;padding:3px 0;display:flex;justify-content:space-between;color:#444;';
+      item.style.cssText = 'font-size:11px;padding:4px 6px;display:flex;justify-content:space-between;color:#444;cursor:pointer;border-radius:6px;';
       item.innerHTML = '<span>' + sgg + '</span><span style="color:' + (dangerSchools > 0 ? '#dc2626' : '#059669') + ';font-weight:600;">' + dangerSchools + '/' + totalSchools + '교</span>';
+      item.onmouseenter = function(){ this.style.background = '#eef3ff'; };
+      item.onmouseleave = function(){ this.style.background = 'transparent'; };
+      (function(sidoName, sggName) {
+        item.onclick = function(e) { e.stopPropagation(); mapShowSggDangerList(sidoName, sggName); };
+      })(sido, sgg);
       sggList.appendChild(item);
     });
     wrapper.appendChild(sggList);
@@ -8060,20 +8090,117 @@ function mapSwitchSub(view) {
   var mapView = document.getElementById('mapSubView-map');
   var regionView = document.getElementById('mapSubView-region');
   var mainWrap = document.querySelector('#tab-map > .main');
+  if (mainWrap) mainWrap.style.height = 'calc(100vh - 110px)';
   if (view === 'map') {
     mapView.style.display = 'flex';
     regionView.style.display = 'none';
-    if (mainWrap) mainWrap.style.height = 'calc(100vh - 110px)';
+    regionView.style.height = '0';
     if (_mapObj) setTimeout(function(){ _mapObj.relayout(); }, 100);
   } else {
     mapView.style.display = 'none';
     regionView.style.display = 'block';
-    if (mainWrap) mainWrap.style.height = 'auto';
-    regionView.style.minHeight = 'calc(100vh - 160px)';
+    regionView.style.height = 'auto';
+    regionView.style.minHeight = '0';
     if (_mapData.length) mapRegionView('sido');
   }
   document.getElementById('mapSubTab-map').classList.toggle('active', view === 'map');
   document.getElementById('mapSubTab-region').classList.toggle('active', view === 'region');
+}
+
+// ── 학교 위치로 이동 + InfoWindow 열기 ──
+function mapPanToSchool(school) {
+  if (!school || !school.lat || !school.lng) return;
+  mapSwitchSub('map');
+  setTimeout(function() {
+    if (!_mapObj) return;
+    _mapObj.setCenter(new kakao.maps.LatLng(school.lat, school.lng));
+    _mapObj.setLevel(3);
+    setTimeout(function() {
+      var mk = _markerPool[school.id];
+      if (!mk) { mk = mapCreateMarker(school); _markerPool[school.id] = mk; }
+      mk.setMap(_mapObj);
+      kakao.maps.event.trigger(mk, 'click');
+    }, 350);
+  }, 120);
+}
+
+function mapPanToSchoolById(id) {
+  var s = (_mapSchools.length ? _mapSchools : _mapData).find(function(x){ return x.id === id; });
+  if (!s) s = _mapData.find(function(x){ return x.id === id; });
+  if (s) mapPanToSchool(s);
+}
+
+// ── 학교 목록 패널 ──
+function mapCloseSchoolList() {
+  var p = document.getElementById('mapSchoolListPanel');
+  if (p) p.style.display = 'none';
+}
+
+function _mapSchoolListItemHtml(d) {
+  var color = d.gradeInfo.color;
+  var elapsed = d.year ? (new Date().getFullYear() - parseInt(d.year)) + '년' : '-';
+  return '<div onclick="mapPanToSchoolById(' + d.id + ')" style="padding:8px 14px;cursor:pointer;border-bottom:1px solid #f5f5f5;" onmouseenter="this.style.background=\'#f7f9ff\'" onmouseleave="this.style.background=\'#fff\'">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">' +
+    '<span style="font-size:12px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + d.school + '</span>' +
+    '<span style="background:' + color + ';color:#fff;padding:1px 7px;border-radius:9999px;font-size:9px;font-weight:700;white-space:nowrap;flex-shrink:0;">' + (d.risk ? d.risk.total + '점' : d.gradeInfo.label) + '</span></div>' +
+    '<div style="font-size:10px;color:#999;margin-top:2px;">' + (d.sido||'') + ' · 안전 ' + (d.grade||'-') + ' · ' + elapsed + '</div></div>';
+}
+
+// 범례 등급 클릭 → 현재 화면 범위 내 해당 등급 학교 목록
+var _mapLastCandidates = [];
+function mapShowSchoolListByGrade(gradeKey, label) {
+  var list = _mapLastCandidates.filter(function(d){ return d.gradeInfo.key === gradeKey; });
+  list.sort(function(a,b){ return (b.risk?b.risk.total:0)-(a.risk?a.risk.total:0); });
+  var panel = document.getElementById('mapSchoolListPanel');
+  document.getElementById('mapSchoolListTitle').textContent = label + ' (' + list.length + ')';
+  var body = document.getElementById('mapSchoolListBody');
+  if (list.length === 0) { body.innerHTML = '<div style="padding:20px;text-align:center;color:#999;font-size:12px;">해당 학교 없음</div>'; }
+  else { body.innerHTML = list.slice(0, 300).map(_mapSchoolListItemHtml).join(''); }
+  panel.style.display = 'flex';
+}
+
+// ── 학교명 검색 ──
+function mapSearchSchools(q) {
+  var box = document.getElementById('mapSearchResults');
+  if (!box) return;
+  q = (q || '').trim();
+  if (!q) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  var src = _mapSchools.length ? _mapSchools : _mapData;
+  var ql = q.toLowerCase();
+  var matches = src.filter(function(d){ return d.school && d.school.toLowerCase().indexOf(ql) >= 0; });
+  matches = matches.slice(0, 30);
+  if (matches.length === 0) { box.innerHTML = '<div style="padding:12px;color:#999;font-size:12px;">검색 결과 없음</div>'; box.style.display = 'block'; return; }
+  box.innerHTML = matches.map(_mapSchoolListItemHtml).join('');
+  box.style.display = 'block';
+}
+
+// 검색 결과 외부 클릭 시 닫기
+document.addEventListener('click', function(e) {
+  var box = document.getElementById('mapSearchResults');
+  var inp = document.getElementById('mapSearchInput');
+  if (box && inp && !box.contains(e.target) && e.target !== inp) box.style.display = 'none';
+});
+
+// ── 시군구 위험 학교 목록 패널 (좌측 사이드바 클릭) ──
+function mapShowSggDangerList(sido, sgg) {
+  var src = _mapSchools.length ? _mapSchools : _mapData;
+  var list = src.filter(function(d){
+    if (d.sido !== sido) return false;
+    var s = mapParseSigungu(d.address) || '기타';
+    return s === sgg;
+  });
+  list.sort(function(a,b){ return (b.risk?b.risk.total:0)-(a.risk?a.risk.total:0); });
+  mapSwitchSub('map');
+  var panel = document.getElementById('mapSchoolListPanel');
+  var dangerCnt = list.filter(function(d){ return d.gradeInfo.key==='danger'||d.gradeInfo.key==='warning'; }).length;
+  document.getElementById('mapSchoolListTitle').textContent = sido + ' ' + sgg + ' (위험·경계 ' + dangerCnt + ')';
+  var body = document.getElementById('mapSchoolListBody');
+  body.innerHTML = list.length ? list.slice(0,300).map(_mapSchoolListItemHtml).join('') : '<div style="padding:20px;text-align:center;color:#999;font-size:12px;">학교 없음</div>';
+  panel.style.display = 'flex';
+  // 해당 시군구로 지도 이동
+  if (list.length && list[0].lat) {
+    setTimeout(function(){ if(_mapObj){ _mapObj.setCenter(new kakao.maps.LatLng(list[0].lat, list[0].lng)); _mapObj.setLevel(6); } }, 150);
+  }
 }
 
 function mapBuildRegionDashboard() {
@@ -8086,9 +8213,10 @@ function mapRegionView(mode) {
   var container = document.getElementById('mapSubView-region');
   if (!_mapData.length) { container.innerHTML = '<div style="padding:40px;text-align:center;color:#7a7a7a;">데이터를 먼저 업로드하세요</div>'; return; }
 
-  // 시도별 집계
+  // 시도별 집계 (학교 단위: 대표동 기준)
   var sidoMap = {};
-  _mapData.forEach(function(d) {
+  var _regionSrc = _mapSchools.length > 0 ? _mapSchools : _mapData;
+  _regionSrc.forEach(function(d) {
     if (!sidoMap[d.sido]) sidoMap[d.sido] = { danger:0, warning:0, caution:0, good:0, unknown:0, schools:new Set(), ages:[] };
     var sm = sidoMap[d.sido];
     sm[d.gradeInfo.key] = (sm[d.gradeInfo.key]||0) + 1;
@@ -8153,9 +8281,10 @@ function mapRegionDrillDown(sido) {
 }
 
 function renderSigunguView(container, sido) {
-  // 시군구 집계
+  // 시군구 집계 (학교 단위: 대표동 기준)
   var sggMap = {};
-  _mapData.forEach(function(d) {
+  var _sggSrc = _mapSchools.length > 0 ? _mapSchools : _mapData;
+  _sggSrc.forEach(function(d) {
     if (d.sido !== sido) return;
     var sgg = mapParseSigungu(d.address) || '기타';
     if (!sggMap[sgg]) sggMap[sgg] = { danger:0, warning:0, caution:0, good:0, unknown:0, schools:new Set(), ages:[] };
@@ -8315,11 +8444,15 @@ function mapShowSchoolDetail(id) {
 
   // 위험도 바
   if (d.risk) {
-    html += '<div style="margin-bottom:8px;font-size:11px;color:#555;">위험도 점수 분해</div>';
+    html += '<div style="margin-bottom:8px;font-size:11px;color:#555;font-weight:600;">위험도 점수 분해</div>';
+    // 총점 바
+    html += '<div style="margin-bottom:12px;"><div style="display:flex;justify-content:space-between;font-size:10px;color:#888;margin-bottom:3px;"><span>총점</span><span style="font-weight:700;color:'+color+';">' + d.risk.total + ' / 10점</span></div>';
+    html += '<div style="background:#eee;border-radius:5px;height:12px;"><div style="width:' + (d.risk.total*10) + '%;height:100%;background:'+color+';border-radius:5px;"></div></div></div>';
     html += '<div style="display:flex;gap:12px;margin-bottom:6px;">';
     html += '<div style="flex:1;"><div style="font-size:10px;color:#888;">안전등급 (' + d.risk.safety + '/5)</div><div style="background:#eee;border-radius:4px;height:8px;margin-top:3px;"><div style="width:' + (d.risk.safety*20) + '%;height:100%;background:'+color+';border-radius:4px;"></div></div></div>';
     html += '<div style="flex:1;"><div style="font-size:10px;color:#888;">경과연수 (' + d.risk.age + '/5)</div><div style="background:#eee;border-radius:4px;height:8px;margin-top:3px;"><div style="width:' + (d.risk.age*20) + '%;height:100%;background:'+color+';border-radius:4px;"></div></div></div>';
     html += '</div>';
+    html += '<div style="font-size:9px;color:#aaa;line-height:1.6;margin-top:6px;">안전등급: A=1·B=2·C=3·D=4·E=5 / 경과연수: 50년↑=5·45년↑=4·43년↑=3·40년↑=2·40년↓=1</div>';
   }
 
   // 지도에서 보기 버튼
