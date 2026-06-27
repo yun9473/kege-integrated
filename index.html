@@ -7321,11 +7321,22 @@ function mapLoadExcel(input) {
       };
     }).filter(function(d) { return d.school || d.address; });
 
-    mapShowLoading('데이터 파싱 완료', _mapData.length + '건 로드, 좌표 변환 시작...', 10);
+    mapShowLoading('데이터 파싱 완료', _mapData.length + '건 로드, 지도 초기화 중...', 10);
     document.getElementById('mapEmptyMsg').style.display = 'none';
     mapBuildSidoFilters();
     mapUpdateStats();
-    setTimeout(function() { mapRenderMarkers(); }, 100);
+    // 지도 초기화 보장 후 렌더링
+    function waitForMapAndRender() {
+      if (_mapObj) {
+        console.log('_mapObj ready, calling mapRenderMarkers');
+        mapRenderMarkers();
+      } else {
+        console.log('_mapObj not ready, calling mapInitKakao and retrying...');
+        mapInitKakao();
+        setTimeout(waitForMapAndRender, 500);
+      }
+    }
+    waitForMapAndRender();
   };
   reader.readAsArrayBuffer(f);
 }
