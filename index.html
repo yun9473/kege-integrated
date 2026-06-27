@@ -7551,53 +7551,91 @@ function mapRenderMarkers() {
   }
 }
 
-// viewport 기반 마커 갱신 — 보이는 영역만 렌더링
+// viewport 기반 마커 갱신
+var _markerPool = {}; // id → marker 재사용 풀
+var _currentVisibleIds = new Set();
+
 function mapUpdateViewport() {
   if (!_mapObj || !_mapReady) return;
   if (_mapViewTimer) clearTimeout(_mapViewTimer);
-  _mapViewTimer = setTimeout(function() {
-    var bounds = _mapObj.getBounds();
-    var sw = bounds.getSouthWest(), ne = bounds.getNorthEast();
-    var sLat = sw.getLat(), sLng = sw.getLng(), nLat = ne.getLat(), nLng = ne.getLng();
+  _mapViewTimer = setTimeout(_doUpdateViewport, 200);
+}
 
-    // 필터 수집
-    var gradeFilter = {};
-    document.querySelectorAll('#tab-map input[data-grade]').forEach(function(cb) {
-      gradeFilter[cb.dataset.grade] = cb.checked;
-    });
-    var sidoFilter = {};
-    document.querySelectorAll('#mapSidoFilters .map-sido-chip').forEach(function(chip) {
-      sidoFilter[chip.dataset.sido] = chip.classList.contains('active');
-    });
-    var allSido = Object.values(sidoFilter).every(function(v) { return !v; });
-    var minElapsed = parseInt(document.getElementById('mapYearSlider').value) || 0;
-    document.getElementById('mapYearVal').textContent = minElapsed + '년+';
+function _doUpdateViewport() {
+  var bounds = _mapObj.getBounds();
+  var sw = bounds.getSouthWest(), ne = bounds.getNorthEast();
+  var sLat = sw.getLat(), sLng = sw.getLng(), nLat = ne.getLat(), nLng = ne.getLng();
+  var zoom = _mapObj.getLevel();
 
-    // 뷰포트 내 + 필터 통과 데이터
-    var visible = [];
-    _mapData.forEach(function(d) {
-      if (!d.lat || !d.lng) return;
-      if (d.lat < sLat || d.lat > nLat || d.lng < sLng || d.lng > nLng) return;
-      if (!gradeFilter[d.gradeInfo.key]) return;
-      if (!allSido && !sidoFilter[d.sido]) return;
-      if (minElapsed > 0 && d.year) {
-        if ((new Date().getFullYear() - parseInt(d.year)) < minElapsed) return;
-      }
-      visible.push(d);
-    });
+  // 필터 수집
+  var gradeFilter = {};
+  document.querySelectorAll('#tab-map input[data-grade]').forEach(function(cb) {
+    gradeFilter[cb.dataset.grade] = cb.checked;
+  });
+  var sidoFilter = {};
+  document.querySelectorAll('#mapSidoFilters .map-sido-chip').forEach(function(chip) {
+    sidoFilter[chip.dataset.sido] = chip.classList.contains('active');
+  });
+  var allSido = Object.values(sidoFilter).every(function(v) { return !v; });
+  var minElapsed = parseInt(document.getElementById('mapYearSlider').value) || 0;
+  document.getElementById('mapYearVal').textContent = minElapsed + '년+';
 
-    // 기존 마커 제거
-    _mapMarkers.forEach(function(m) { m.setMap(null); });
-    _mapMarkers = [];
-    if (_mapClusterer) _mapClusterer.clear();
+  // 뷰포트 + 필터 통과 데이터 수집
+  var visibleData = [];
+  for (var i = 0; i < _mapData.length; i++) {
+    var d = _mapData[i];
+    if (!d.lat || !d.lng) continue;
+    if (d.lat < sLat || d.lat > nLat || d.lng < sLng || d.lng > nLng) continue;
+    if (!gradeFilter[d.gradeInfo.key]) continue;
+    if (!allSido && !sidoFilter[d.sido]) continue;
+    if (minElapsed > 0 && d.year && (new Date().getFullYear() - parseInt(d.year)) < minElapsed) continue;
+    visibleData.push(d);
+  }
 
-    // 마커 생성 (뷰포트 내 것만)
-    visible.forEach(function(d) {
-      _mapMarkers.push(mapCreateMarker(d));
-    });
+  // 줌 레벨별 최대 마커 수 제한 (축소 시 샘플링)
+  var MAX_MARKERS = 3000;
+  if (visibleData.length > MAX_MARKERS) {
+    // 위험도 높은 순 정렬 후 상위 MAX_MARKERS개
+    visibleData.sort(function(a, b) { return (b.risk ? b.risk.total : 0) - (a.risk ? a.risk.total : 0); });
+    visibleData = visibleData.slice(0, MAX_MARKERS);
+  }
 
-    if (_mapClusterer) _mapClusterer.addMarkers(_mapMarkers);
-  }, 150);
+  // 새로 보이는 것 / 사라지는 것 비교
+  var newIds = new Set();
+  visibleData.forEach(function(d) { newIds.add(d.id); });
+
+  // 사라진 마커 제거
+  var toRemove = [];
+  _currentVisibleIds.forEach(function(id) {
+    if (!newIds.has(id) && _markerPool[id]) {
+      toRemove.push(id);
+    }
+  });
+
+  // 새로 추가할 마커
+  var toAdd = [];
+  newIds.forEach(function(id) {
+    if (!_currentVisibleIds.has(id)) toAdd.push(id);
+  });
+
+  // 변경이 없으면 스킵
+  if (toRemove.length === 0 && toAdd.length === 0) return;
+
+  // 클러스터러 갱신 (전체 재구성이 가장 빠름)
+  if (_mapClusterer) _mapClusterer.clear();
+  _mapMarkers = [];
+
+  visibleData.forEach(function(d) {
+    var m = _markerPool[d.id];
+    if (!m) {
+      m = mapCreateMarker(d);
+      _markerPool[d.id] = m;
+    }
+    _mapMarkers.push(m);
+  });
+
+  if (_mapClusterer) _mapClusterer.addMarkers(_mapMarkers);
+  _currentVisibleIds = newIds;
 }
 
 function mapApplyFilter() {
