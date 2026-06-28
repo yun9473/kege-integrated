@@ -2548,6 +2548,7 @@ let _supabase = null;
 let _supabaseProfile = null;
 let _sessionTimer = null;
 let _lastActivity = Date.now();
+let _sessionToken = localStorage.getItem('_sessionToken') || '';
 
 async function initSupabase() {
   if (_supabase) return _supabase;
@@ -2561,10 +2562,15 @@ async function initSupabase() {
 async function authFetch(url, options) {
   options = options || {};
   var headers = Object.assign({}, options.headers || {});
+  // 관리자: Supabase JWT 사용
   if (_supabase) {
     var sess = await _supabase.auth.getSession();
     var token = sess && sess.data && sess.data.session ? sess.data.session.access_token : '';
     if (token) headers['Authorization'] = 'Bearer ' + token;
+  }
+  // 학교/발주청: 세션 토큰 사용
+  if (!headers['Authorization'] && _sessionToken) {
+    headers['Authorization'] = 'Bearer ' + _sessionToken;
   }
   return fetch(url, Object.assign({}, options, { headers: headers }));
 }
@@ -2657,41 +2663,7 @@ function switchModule(mod, el) {
 // ════════════════════════════════════
 // MASTER DATA
 // ════════════════════════════════════
-// 프로젝트 로드 후 덮어씌워짐 (초기값: 빈 배열)
-let SCHOOLS = [
-  {id:1,  disp:21, school:'효촌초',     building:'본관동',            region:'1권역', area:'동두천양주', type:'공립', phone:''},
-  {id:2,  disp:22, school:'능곡초',     building:'본관',              region:'1권역', area:'고양',      type:'공립', phone:''},
-  {id:3,  disp:23, school:'능곡초',     building:'별관',              region:'1권역', area:'고양',      type:'공립', phone:''},
-  {id:5,  disp:24, school:'덕소초',     building:'교사1호동',         region:'1권역', area:'남양주',    type:'공립', phone:''},
-  {id:6,  disp:25, school:'덕소초',     building:'교사2호동',         region:'1권역', area:'남양주',    type:'공립', phone:''},
-  {id:7,  disp:26, school:'금촌초',     building:'본관동',            region:'1권역', area:'파주',      type:'공립', phone:''},
-  {id:8,  disp:27, school:'금촌초',     building:'후관동',            region:'1권역', area:'파주',      type:'공립', phone:''},
-  {id:9,  disp:28, school:'금촌초',     building:'급식실',            region:'1권역', area:'파주',      type:'공립', phone:''},
-  {id:10, disp:29, school:'경북중',     building:'본관',              region:'1권역', area:'포천',      type:'공립', phone:''},
-  {id:11, disp:30, school:'포천중',     building:'교사1호동',         region:'1권역', area:'포천',      type:'공립', phone:''},
-  {id:12, disp:31, school:'일동고',     building:'본관동',            region:'1권역', area:'포천',      type:'공립', phone:''},
-  {id:13, disp:32, school:'의정부여중', building:'교사2호동',         region:'1권역', area:'의정부',    type:'공립', phone:''},
-  {id:14, disp:15, school:'동부초',     building:'본관 가동',         region:'2권역', area:'광주하남',  type:'공립', phone:''},
-  {id:15, disp:16, school:'동부초',     building:'본관 나동',         region:'2권역', area:'광주하남',  type:'공립', phone:''},
-  {id:16, disp:17, school:'신하초',     building:'본관',              region:'2권역', area:'이천',      type:'공립', phone:''},
-  {id:17, disp:18, school:'대월중',     building:'본관동',            region:'2권역', area:'이천',      type:'공립', phone:''},
-  {id:18, disp:19, school:'백사중',     building:'본관동',            region:'2권역', area:'이천',      type:'공립', phone:''},
-  {id:19, disp:13, school:'한광여고',   building:'본관동',            region:'3권역', area:'평택',      type:'사립', phone:''},
-  {id:20, disp:14, school:'한광여고',   building:'별관22호동',        region:'3권역', area:'평택',      type:'사립', phone:''},
-  {id:21, disp:3,  school:'삼일고',     building:'본관동',            region:'3권역', area:'수원',      type:'사립', phone:''},
-  {id:22, disp:5,  school:'성문고',     building:'본관동(2동)',       region:'3권역', area:'안양과천',  type:'사립', phone:''},
-  {id:23, disp:4,  school:'명학초',     building:'본관동',            region:'3권역', area:'안양과천',  type:'공립', phone:''},
-  {id:24, disp:6,  school:'관양초',     building:'교사1호동',         region:'3권역', area:'안양과천',  type:'공립', phone:''},
-  {id:25, disp:7,  school:'관양초',     building:'교사2호동',         region:'3권역', area:'안양과천',  type:'공립', phone:''},
-  {id:26, disp:8,  school:'소사초',     building:'교사1호동',         region:'3권역', area:'부천',      type:'공립', phone:''},
-  {id:27, disp:9,  school:'소사초',     building:'교사2호동',         region:'3권역', area:'부천',      type:'공립', phone:''},
-  {id:28, disp:10, school:'부천여고',   building:'1호동(본관)',       region:'3권역', area:'부천',      type:'공립', phone:''},
-  {id:29, disp:11, school:'부천여고',   building:'4호동(지성원)',     region:'3권역', area:'부천',      type:'공립', phone:''},
-  {id:30, disp:12, school:'관산초',     building:'교사1호동(본관동)', region:'3권역', area:'안산',      type:'공립', phone:''},
-  {id:31, disp:1,  school:'동성중',     building:'교사1호동',         region:'3권역', area:'수원',      type:'공립', phone:''},
-  {id:32, disp:2,  school:'동성중',     building:'창고및교실',        region:'3권역', area:'수원',      type:'공립', phone:''},
-  {id:33, disp:20, school:'양진초',     building:'제1캠퍼스1호동',   region:'2권역', area:'안성',      type:'공립', phone:''},
-].sort((a,b)=>a.disp-b.disp);
+let SCHOOLS = [];
 
 const sLabel = s => `${String(s.disp).padStart(2,'0')}. ${s.school} ${s.building}`;
 
@@ -3092,21 +3064,19 @@ function fileToBase64(file){
 // ════════════════════════════════════
 // 프로젝트 로딩
 // ════════════════════════════════════
-const RAW='https://raw.githubusercontent.com/yun9473/upload-system/main';
+// GitHub raw URL 제거됨 — 데이터는 /api/project-data를 통해 접근
 
-// 프로젝트 index.json 조회 (인증 후에만 호출 — 로그인 전 화면에 노출 안 됨)
 async function fetchProjectIndex(){
   try{
-    const r=await fetch(`${RAW}/data/projects/index.json?_=${Date.now()}`);
+    const r=await authFetch('/api/project-data?action=index');
     if(!r.ok) return null;
     allProjects=await r.json();
     return allProjects;
   }catch{ return null; }
 }
 
-// 특정 프로젝트 JSON 로드 후 전역 변수 세팅
 async function loadProject(id){
-  const r=await fetch(`${RAW}/data/projects/${id}.json?_=${Date.now()}`);
+  const r=await authFetch('/api/project-data?action=load&id='+encodeURIComponent(id));
   if(!r.ok) throw new Error('프로젝트 로드 실패');
   currentProject=await r.json();
   SCHOOLS=currentProject.schools.slice().sort((a,b)=>a.disp-b.disp);
@@ -3116,7 +3086,7 @@ async function loadProject(id){
 // 관리자 설정 탭 내부에서 프로젝트 목록 갱신용
 async function initProjectList(){
   try{
-    const r=await fetch(`${RAW}/data/projects/index.json?_=${Date.now()}`);
+    const r=await authFetch('/api/project-data?action=index');
     if(!r.ok) throw new Error();
     allProjects=await r.json();
   }catch{ allProjects=[]; }
@@ -3136,33 +3106,23 @@ async function loginSchool(){
   const schoolName=document.getElementById('l-sid').value.trim();
   const pw=document.getElementById('l-spw').value.trim();
   if(!schoolName){ showLoginErr('학교명을 입력하세요.'); return; }
-  if(pw!==(cfg().schoolPw||'1234')){ showLoginErr('비밀번호가 틀렸습니다.'); return; }
+  if(!pw){ showLoginErr('비밀번호를 입력하세요.'); return; }
 
   const btn=document.getElementById('btn-school-login');
   btn.disabled=true; btn.textContent='검색 중…';
   showLoginErr('소속 프로젝트 확인 중...');
 
   try{
-    const projects=await fetchProjectIndex();
-    if(!projects){ showLoginErr('서버 연결 오류. 잠시 후 다시 시도해주세요.'); return; }
-    for(const meta of projects){
-      try{
-        const r=await fetch(`${RAW}/data/projects/${meta.id}.json?_=${Date.now()}`);
-        if(!r.ok) continue;
-        const proj=await r.json();
-        if(proj.codes && proj.codes[schoolName]){
-          currentProject=proj;
-          SCHOOLS=proj.schools.slice().sort((a,b)=>a.disp-b.disp);
-          DEFAULT_CODES=proj.codes||{};
-          role='school'; visIds=[...proj.codes[schoolName]];
-          clearLoginErr();
-          startSessionTimeout();
-          startApp(`학교 (${schoolName})`);
-          return;
-        }
-      }catch{}
-    }
-    showLoginErr('학교명이 올바르지 않습니다.');
+    const res=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'school',id:schoolName,pw:pw})});
+    const d=await res.json();
+    if(!res.ok){ showLoginErr(d.error||'로그인 실패'); return; }
+    _sessionToken=d.token;
+    localStorage.setItem('_sessionToken',d.token);
+    await loadProject(d.projectId);
+    role='school'; visIds=d.visIds;
+    clearLoginErr();
+    startSessionTimeout();
+    startApp(d.label);
   }finally{
     btn.disabled=false; btn.textContent='접속하기';
   }
@@ -3172,27 +3132,28 @@ async function loginAgency(){
   const agencyName=document.getElementById('l-aid').value.trim();
   const pw=document.getElementById('l-apw').value.trim();
   if(!agencyName){ showLoginErr('교육청명을 입력하세요.'); return; }
-  if(pw!==(cfg().agencyPw||'12345')){ showLoginErr('비밀번호가 틀렸습니다.'); return; }
+  if(!pw){ showLoginErr('비밀번호를 입력하세요.'); return; }
 
   const btn=document.getElementById('btn-agency-login');
   btn.disabled=true; btn.textContent='확인 중…';
-  showLoginErr('프로젝트 목록 불러오는 중...');
+  showLoginErr('인증 중...');
 
   try{
-    const projects=await fetchProjectIndex();
-    if(!projects){ showLoginErr('서버 연결 오류. 잠시 후 다시 시도해주세요.'); return; }
-    const matching=projects.filter(p=>p.교육청===agencyName||p.교육청.includes(agencyName));
-    if(matching.length===0){ showLoginErr('해당 교육청의 프로젝트가 없습니다.'); return; }
+    const res=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'agency',id:agencyName,pw:pw})});
+    const d=await res.json();
+    if(!res.ok){ showLoginErr(d.error||'로그인 실패'); return; }
+    _sessionToken=d.token;
+    localStorage.setItem('_sessionToken',d.token);
     clearLoginErr();
-    if(matching.length===1){
-      await loadProject(matching[0].id);
+    if(d.projects.length===1){
+      await loadProject(d.projects[0].id);
       role='agency'; visIds=SCHOOLS.map(s=>s.id);
       startSessionTimeout();
-      startApp(`발주청 (${agencyName})`);
+      startApp(d.label);
     } else {
       const sel=document.getElementById('l-agency-proj-sel');
       sel.innerHTML='<option value="">— 프로젝트를 선택하세요 —</option>'+
-        matching.map(p=>`<option value="${p.id}">${p.name} (${p.year})</option>`).join('');
+        d.projects.map(p=>`<option value="${p.id}">${p.name} (${p.year})</option>`).join('');
       document.getElementById('l-agency-authed').textContent=`${agencyName} 인증 완료`;
       sel._agencyName=agencyName;
       document.getElementById('lp-agency-login').style.display='none';
@@ -3338,6 +3299,8 @@ async function logout(){
   if(_supabase) try{ await _supabase.auth.signOut(); }catch(e){}
   if(_sessionTimer) clearInterval(_sessionTimer);
   _supabaseProfile = null;
+  _sessionToken = '';
+  localStorage.removeItem('_sessionToken');
   localStorage.removeItem('bzSession');
   document.getElementById('screen-login').style.display='flex';
   document.getElementById('screen-app').style.display='none';
@@ -4848,7 +4811,7 @@ async function buildProjectList(){
   if(!el) return;
   // 잠시 후 GitHub에서 최신 목록 가져오기
   try{
-    const r=await fetch(`${RAW}/data/projects/index.json?_=${Date.now()}`);
+    const r=await authFetch('/api/project-data?action=index');
     if(!r.ok) throw new Error();
     allProjects=await r.json();
   }catch{ /* 캐시 사용 */ }
@@ -4880,29 +4843,33 @@ async function deleteProject(id, name){
 // ════════════════════════════════════
 (async function restoreSession(){
   try{
-    var sb = await initSupabase();
-    if(!sb) return;
-    var sess = await sb.auth.getSession();
-    if(!sess || !sess.data || !sess.data.session) return;
-    var prof = await fetchProfile();
-    if(!prof) { await sb.auth.signOut(); return; }
-    _supabaseProfile = prof;
     var s = JSON.parse(localStorage.getItem('bzSession')||'null');
-    if(!s) { await sb.auth.signOut(); return; }
+    if(!s) return;
+
+    // 관리자: Supabase 세션 복원
+    if(s.role === 'admin') {
+      var sb = await initSupabase();
+      if(!sb) return;
+      var sess = await sb.auth.getSession();
+      if(!sess || !sess.data || !sess.data.session) return;
+      var prof = await fetchProfile();
+      if(!prof) { await sb.auth.signOut(); return; }
+      _supabaseProfile = prof;
+    }
+    // 학교/발주청: 세션 토큰 확인
+    else {
+      if(!_sessionToken) return;
+      var check = await authFetch('/api/project-data?action=index');
+      if(!check.ok) { _sessionToken=''; localStorage.removeItem('_sessionToken'); return; }
+    }
+
     if(s.projectId){
-      try{
-        var r=await fetch(RAW+'/data/projects/'+s.projectId+'.json?_='+Date.now());
-        if(r.ok){
-          currentProject=await r.json();
-          SCHOOLS=currentProject.schools.slice().sort(function(a,b){return a.disp-b.disp;});
-          DEFAULT_CODES=currentProject.codes||{};
-        }
-      }catch(e){}
+      try{ await loadProject(s.projectId); }catch(e){ return; }
     }
     role=s.role; visIds=s.visIds;
     startSessionTimeout();
     startApp(s.label);
-  }catch(e){ localStorage.removeItem('bzSession'); }
+  }catch(e){ localStorage.removeItem('bzSession'); localStorage.removeItem('_sessionToken'); }
 })();
 
 
@@ -6497,7 +6464,7 @@ function hbSearchSchool() {
       _hbShowManualInput(statusEl, resultsEl, q);
       return;
     }
-    fetch('/api/school-search?q=' + encodeURIComponent(variants[idx]))
+    authFetch('/api/school-search?q=' + encodeURIComponent(variants[idx]))
       .then(function(r) { return r.json(); })
       .then(function(data) {
         var rows = data.schoolInfo && data.schoolInfo[1] && data.schoolInfo[1].row;
@@ -6538,7 +6505,7 @@ function hbFetchGrade(school) {
   var nm   = school.SCHUL_NM || '';
   var addr = school.ORG_RDNMA || school.ORG_RDNDA || '';
 
-  fetch('/api/fms-proxy?facilNm=' + encodeURIComponent(nm))
+  authFetch('/api/fms-proxy?facilNm=' + encodeURIComponent(nm))
     .then(function(r) { return r.json(); })
     .then(function(data) {
       var body = data.response && data.response.body;
@@ -6592,7 +6559,7 @@ function _hbFetchBuilding(school, statusEl, resultsEl) {
   if (siDo) qs += '&siDo=' + encodeURIComponent(siDo);
   if (siGunGu) qs += '&siGunGu=' + encodeURIComponent(siGunGu);
 
-  fetch('/api/building-search' + qs)
+  authFetch('/api/building-search' + qs)
     .then(function(r) { return r.json(); })
     .then(function(data) {
       var items = data.items || [];

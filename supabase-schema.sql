@@ -57,3 +57,15 @@ $$ LANGUAGE sql SECURITY DEFINER;
 
 -- session_activity에 user_id UNIQUE 제약 추가
 ALTER TABLE session_activity ADD CONSTRAINT session_activity_user_unique UNIQUE (user_id);
+
+-- 5. 세션 토큰 테이블 (학교/발주청 로그인용)
+CREATE TABLE IF NOT EXISTS session_tokens (
+  token UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  role TEXT NOT NULL,
+  identifier TEXT NOT NULL,
+  project_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  expires_at TIMESTAMPTZ DEFAULT now() + INTERVAL '30 minutes'
+);
+
+ALTER TABLE session_tokens ENABLE ROW LEVEL SECURITY;
