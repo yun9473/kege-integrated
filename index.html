@@ -2514,6 +2514,14 @@ table.dtable tbody tr{cursor:pointer;}
 
 
 <script>
+// ── DOM 구조 수정: module-research를 screen-app 안으로 이동 ──
+(function(){
+  var app = document.getElementById('screen-app');
+  var research = document.getElementById('module-research');
+  if (app && research && research.parentElement !== app) {
+    app.appendChild(research);
+  }
+})();
 // ═══════════════════════════════════════
 // MODULE SWITCHING
 // ═══════════════════════════════════════
@@ -2556,6 +2564,11 @@ function switchModule(mod, el) {
   if (mod !== 'dashboard') {
     var dashPanel = document.getElementById('module-dashboard');
     if (dashPanel) dashPanel.classList.remove('active');
+    // tab-search, tab-edu, tab-map이 module-dashboard 밖에 있으므로 직접 숨김
+    ['tab-search','tab-edu','tab-map'].forEach(function(tid){
+      var t = document.getElementById(tid);
+      if (t) { t.classList.remove('active'); t.style.display = 'none'; }
+    });
   }
   if (mod === 'dashboard') {
     setTimeout(function(){ window.dispatchEvent(new Event('resize')); }, 150);
@@ -5138,9 +5151,16 @@ function countUp(el,target,dec,ms){
 // ── 탭 전환 (4탭) ──
 function switchTab(id,el){
   document.querySelectorAll('#module-dashboard .tab-content').forEach(t=>t.classList.remove('active'));
+  // tab-search, tab-edu, tab-map은 module-dashboard 밖에 있으므로 직접 비활성화
+  ['tab-search','tab-edu','tab-map'].forEach(function(tid){
+    var t=document.getElementById(tid);
+    if(t){ t.classList.remove('active'); t.style.display='none'; }
+  });
   document.querySelectorAll('#module-dashboard .tab-bar .tab').forEach(t=>t.classList.remove('active'));
   var newId = id==='compare'?'analysis':id==='trend'?'analysis':id==='detail'?'search':id==='metrics'?'analysis':id==='predict'?'predict':id;
-  document.getElementById('tab-'+newId).classList.add('active');
+  var target=document.getElementById('tab-'+newId);
+  target.classList.add('active');
+  target.style.display='block';
   // tab bar el 처리
   var targetId=newId;
   document.querySelectorAll('#module-dashboard .tab-bar .tab').forEach(t=>{
