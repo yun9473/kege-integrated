@@ -25,8 +25,11 @@ export default async function handler(req, res) {
     } catch (e) {
       return res.status(502).json({ error: '서버 연결 오류' });
     }
-    if (!indexRes.ok) return res.status(502).json({ error: '프로젝트 목록 로드 실패' });
+    if (!indexRes.ok) return res.status(502).json({ error: '프로젝트 목록 로드 실패: HTTP ' + indexRes.status });
     const projects = await indexRes.json();
+    if (!Array.isArray(projects) || projects.length === 0) {
+      return res.status(502).json({ error: '프로젝트 목록 비어있음', raw: JSON.stringify(projects).substring(0, 200) });
+    }
 
     const errors = [];
     for (const meta of projects) {
