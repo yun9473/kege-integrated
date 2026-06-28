@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import { verifyAuth, cors } from './_auth.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -7,13 +6,18 @@ const supabase = createClient(
 );
 
 export default async function handler(req, res) {
-  cors(res);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const authUser = await verifyAuth(req);
-  if (!authUser || authUser.role !== 'admin') {
-    return res.status(403).json({ error: '관리자 권한 필요' });
-  }
+  // 인라인 인증 체크
+  const token = (req.headers.authorization || '').replace('Bearer ', '');
+  if (!token) return res.status(403).json({ error: '관리자 권한 필요' });
+  const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
+  if (authErr || !user) return res.status(403).json({ error: '관리자 권한 필요' });
+  const { data: authUser } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+  if (!authUser || authUser.role !== 'admin') return res.status(403).json({ error: '관리자 권한 필요' });
 
   if (req.method === 'GET') {
     const { data: profiles, error } = await supabase
