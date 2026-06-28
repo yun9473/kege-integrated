@@ -37,6 +37,7 @@ export default async function handler(req, res) {
         const r = await fetch(`${RAW}/data/projects/${meta.id}.json?_=${Date.now()}`);
         if (!r.ok) { errors.push(`${meta.id}: HTTP ${r.status}`); continue; }
         const proj = await r.json();
+        errors.push(`${meta.id}: codes_keys=${Object.keys(proj.codes||{}).join(',')}, match=${!!(proj.codes&&proj.codes[id])}`);
         if (proj.codes && proj.codes[id]) {
           const { data: token, error } = await sb.from('session_tokens').insert({
             role: 'school',
