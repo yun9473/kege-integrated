@@ -5150,8 +5150,9 @@ function countUp(el,target,dec,ms){
 
 // ── 탭 전환 (4탭) ──
 function switchTab(id,el){
-  document.querySelectorAll('#module-dashboard .tab-content').forEach(t=>t.classList.remove('active'));
-  // tab-search, tab-edu, tab-map은 module-dashboard 밖에 있으므로 직접 비활성화
+  // module-dashboard 내부 탭 비활성화
+  document.querySelectorAll('#module-dashboard .tab-content').forEach(function(t){ t.classList.remove('active'); t.style.display=''; });
+  // module-dashboard 밖에 있는 탭도 직접 비활성화
   ['tab-search','tab-edu','tab-map'].forEach(function(tid){
     var t=document.getElementById(tid);
     if(t){ t.classList.remove('active'); t.style.display='none'; }
@@ -5160,7 +5161,7 @@ function switchTab(id,el){
   var newId = id==='compare'?'analysis':id==='trend'?'analysis':id==='detail'?'search':id==='metrics'?'analysis':id==='predict'?'predict':id;
   var target=document.getElementById('tab-'+newId);
   target.classList.add('active');
-  target.style.display='block';
+  if(['tab-search','tab-edu','tab-map'].indexOf('tab-'+newId)>=0) target.style.display='block';
   // tab bar el 처리
   var targetId=newId;
   document.querySelectorAll('#module-dashboard .tab-bar .tab').forEach(t=>{
