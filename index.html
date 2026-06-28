@@ -191,9 +191,6 @@ body{font-family:'Pretendard',system-ui,-apple-system,'Apple SD Gothic Neo',sans
 .ovt-x{color:var(--red);font-weight:700;font-size:14px}
 .ovt-na{color:var(--amber);font-size:10px;font-weight:600;line-height:1.2}
 .ovt-yr{color:var(--blue);font-size:11px;font-weight:600}
-.pct-ok{background:var(--green-l);color:var(--green);font-weight:700;font-size:11px}
-.pct-half{background:var(--amber-l);color:var(--amber);font-weight:700;font-size:11px}
-.pct-low{background:var(--red-l);color:var(--red);font-weight:700;font-size:11px}
 
 /* ═══ MOBILE LAYOUT ═══ */
 @media(max-width:768px){
@@ -451,7 +448,6 @@ body{font-family:'Pretendard',system-ui,-apple-system,'Apple SD Gothic Neo',sans
 .map-subtab:hover:not(.active){color:#0066cc;}
 .kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;}
 .kpi-card{background:#fff;border-radius:18px;padding:14px 16px;border-left:none;border:1px solid #e0e0e0;}
-.kpi-card.red{border-left:none;}.kpi-card.orange{border-left:none;}.kpi-card.green{border-left:none;}.kpi-card.purple{border-left:none;}.kpi-card.navy{border-left:none;}
 .kpi-label{font-size:10px;color:#7a7a7a;font-weight:600;margin-bottom:4px;}
 .kpi-value{font-size:22px;font-weight:800;color:#1d1d1f;line-height:1;}
 .kpi-unit{font-size:11px;font-weight:400;color:#7a7a7a;margin-left:2px;}
@@ -603,6 +599,10 @@ table.dtable tbody tr{cursor:pointer;}
 
 /* Fix modal z-index conflicts */
 #module-dashboard .modal-overlay{z-index:2000;}
+/* ── 유틸리티 클래스 (인라인 스타일 정리) ── */
+.label-up{font-size:11px;font-weight:700;color:var(--gray);margin-bottom:8px;text-transform:uppercase;}
+.label-sm{font-size:11px;font-weight:700;color:#7a7a7a;margin-bottom:6px;}
+.step-num{width:28px;height:28px;border-radius:50%;background:#f5f5f7;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#0066cc;flex-shrink:0;}
 </style>
 </head>
 <body>
@@ -1549,7 +1549,7 @@ table.dtable tbody tr{cursor:pointer;}
         </div>
 
         <div style="margin-bottom:12px;">
-          <div style="font-size:11px;font-weight:700;color:#7a7a7a;margin-bottom:6px;">예측 대상 시도 <span style="font-weight:400;color:#7a7a7a;">(LCC 만점 기준 적용)</span></div>
+          <div class="label-sm">예측 대상 시도 <span style="font-weight:400;color:#7a7a7a;">(LCC 만점 기준 적용)</span></div>
           <select id="hb-sido-sel" onchange="hbUpdateSidoMax()"
             style="width:100%;border:1px solid #e0e0e0;border-radius:8px;padding:7px 12px;font-size:12px;color:#1d1d1f;background:#f5f5f7;outline:none;">
             <option value="">전체 통합 (5개 시도 통합 분석)</option>
@@ -1565,7 +1565,7 @@ table.dtable tbody tr{cursor:pointer;}
 
 
         <div style="margin-bottom:12px;">
-          <div style="font-size:11px;font-weight:700;color:#7a7a7a;margin-bottom:6px;">안전등급</div>
+          <div class="label-sm">안전등급</div>
           <div style="display:flex;gap:6px;" id="hb-grade-group">
             <button class="sido-chip active" data-val="A" onclick="hbSelect('grade',this)">A등급</button>
             <button class="sido-chip" data-val="B" onclick="hbSelect('grade',this)">B등급</button>
@@ -1575,7 +1575,7 @@ table.dtable tbody tr{cursor:pointer;}
         </div>
 
         <div style="margin-bottom:12px;">
-          <div style="font-size:11px;font-weight:700;color:#7a7a7a;margin-bottom:6px;">내진성능</div>
+          <div class="label-sm">내진성능</div>
           <div style="display:flex;gap:6px;" id="hb-seis-group">
             <button class="sido-chip active" data-val="미확보" onclick="hbSelect('seis',this)">미확보·미실시</button>
             <button class="sido-chip" data-val="확보" onclick="hbSelect('seis',this)">확보</button>
@@ -1583,13 +1583,13 @@ table.dtable tbody tr{cursor:pointer;}
         </div>
 
         <div style="margin-bottom:12px;">
-          <div style="font-size:11px;font-weight:700;color:#7a7a7a;margin-bottom:6px;">준공연도</div>
+          <div class="label-sm">준공연도</div>
           <input id="hb-year" type="number" min="1950" max="2010" placeholder="예) 1980"
             style="width:100%;border:1px solid #e0e0e0;border-radius:8px;padding:7px 12px;font-size:13px;color:#1d1d1f;background:#f5f5f7;outline:none;">
         </div>
 
         <div style="margin-bottom:12px;">
-          <div style="font-size:11px;font-weight:700;color:#7a7a7a;margin-bottom:6px;">리모델링 예상 항목 <span style="font-weight:400;color:#7a7a7a;">(해당 항목 선택)</span></div>
+          <div class="label-sm">리모델링 예상 항목 <span style="font-weight:400;color:#7a7a7a;">(해당 항목 선택)</span></div>
           <div id="hb-lcc-items" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;background:#f5f5f7;border-radius:8px;padding:8px;border:1px solid #e0e0e0;margin-bottom:7px;">
             <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;color:#1d1d1f;">
               <input type="checkbox" value="290.5" onchange="hbCalcLcc()" style="accent-color:#0066cc;"> AW창호 (방충망·난간)
@@ -1631,7 +1631,7 @@ table.dtable tbody tr{cursor:pointer;}
         </div>
 
         <div style="margin-bottom:16px;">
-          <div style="font-size:11px;font-weight:700;color:#7a7a7a;margin-bottom:6px;">
+          <div class="label-sm">
             LCC 경제성 점수 추정 <span style="font-size:10px;font-weight:400;color:#7a7a7a;">— 해당 항목 체크 (2026 경기교육청 단가 기준)</span>
           </div>
             <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -2149,7 +2149,7 @@ table.dtable tbody tr{cursor:pointer;}
 
       <!-- 점수 모드 -->
       <div style="margin-bottom:18px;">
-        <div style="font-size:11px;font-weight:700;color:var(--gray);margin-bottom:8px;text-transform:uppercase;">점수 기준</div>
+        <div class="label-up">점수 기준</div>
         <div style="display:flex;gap:0;border-radius:8px;overflow:hidden;border:1px solid #e0e0e0;">
           <button id="mapScoreMode-both" class="map-score-btn active" onclick="mapSetScoreMode('both')">종합 (10점)</button>
           <button id="mapScoreMode-safety" class="map-score-btn" onclick="mapSetScoreMode('safety')">안전등급 (5점)</button>
@@ -2159,7 +2159,7 @@ table.dtable tbody tr{cursor:pointer;}
 
       <!-- 위험도 등급 필터 -->
       <div style="margin-bottom:18px;">
-        <div style="font-size:11px;font-weight:700;color:var(--gray);margin-bottom:8px;text-transform:uppercase;">위험도 등급</div>
+        <div class="label-up">위험도 등급</div>
         <div id="mapGradeFilterLabels">
           <label class="map-filter-item" style="--fc:#dc2626"><input type="checkbox" checked onchange="mapApplyFilter()" data-grade="danger"><span class="map-dot" style="background:#dc2626"></span> <span class="map-grade-label">위험 (7~10)</span></label>
           <label class="map-filter-item" style="--fc:#d97706"><input type="checkbox" checked onchange="mapApplyFilter()" data-grade="warning"><span class="map-dot" style="background:#d97706"></span> <span class="map-grade-label">경계 (5~6)</span></label>
@@ -2171,13 +2171,13 @@ table.dtable tbody tr{cursor:pointer;}
 
       <!-- 시도별 필터 (아코디언) -->
       <div style="margin-bottom:18px;">
-        <div style="font-size:11px;font-weight:700;color:var(--gray);margin-bottom:8px;text-transform:uppercase;">시도별</div>
+        <div class="label-up">시도별</div>
         <div id="mapSidoFilters" style="display:flex;flex-direction:column;gap:2px;"></div>
       </div>
 
       <!-- 경과연수 필터 -->
       <div style="margin-bottom:18px;">
-        <div style="font-size:11px;font-weight:700;color:var(--gray);margin-bottom:8px;text-transform:uppercase;">경과연수</div>
+        <div class="label-up">경과연수</div>
         <div style="display:flex;align-items:center;gap:6px;">
           <input type="range" id="mapYearSlider" min="0" max="80" value="0" style="flex:1;" oninput="mapApplyFilter()">
           <span id="mapYearVal" style="font-size:11px;font-weight:600;min-width:40px;">0년+</span>
@@ -2479,15 +2479,15 @@ table.dtable tbody tr{cursor:pointer;}
           <div style="font-size:15px;font-weight:700;color:#1d1d1f;margin-bottom:20px;">사용 방법</div>
           <div style="display:flex;flex-direction:column;gap:16px;">
             <div style="display:flex;gap:16px;align-items:flex-start;">
-              <div style="width:28px;height:28px;border-radius:50%;background:#f5f5f7;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#0066cc;flex-shrink:0;">1</div>
+              <div class="step-num">1</div>
               <div><div style="font-size:14px;font-weight:600;color:#1d1d1f;">두 파일을 같은 폴더에 저장</div><div style="font-size:13px;color:#7a7a7a;margin-top:2px;">DXF2PPT.exe와 증축이력 서식.pptx를 같은 위치에 두세요</div></div>
             </div>
             <div style="display:flex;gap:16px;align-items:flex-start;">
-              <div style="width:28px;height:28px;border-radius:50%;background:#f5f5f7;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#0066cc;flex-shrink:0;">2</div>
+              <div class="step-num">2</div>
               <div><div style="font-size:14px;font-weight:600;color:#1d1d1f;">DXF2PPT.exe 실행</div><div style="font-size:13px;color:#7a7a7a;margin-top:2px;">프로그램을 더블클릭하여 실행합니다</div></div>
             </div>
             <div style="display:flex;gap:16px;align-items:flex-start;">
-              <div style="width:28px;height:28px;border-radius:50%;background:#f5f5f7;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#0066cc;flex-shrink:0;">3</div>
+              <div class="step-num">3</div>
               <div><div style="font-size:14px;font-weight:600;color:#1d1d1f;">DXF 파일 선택 → PPT 자동 생성</div><div style="font-size:13px;color:#7a7a7a;margin-top:2px;">증축이력 도면(DXF)을 선택하면 PPT가 자동으로 만들어집니다</div></div>
             </div>
           </div>
@@ -2525,7 +2525,6 @@ table.dtable tbody tr{cursor:pointer;}
 // ═══════════════════════════════════════
 // MODULE SWITCHING
 // ═══════════════════════════════════════
-var _dashboardChartsReady = false;
 function switchModule(mod, el) {
   document.querySelectorAll('.integrated-nav .nav-item').forEach(function(b){ b.classList.remove('active'); });
   el.classList.add('active');
@@ -3183,7 +3182,6 @@ async function enterAdminProject(){
   }catch(e){ showLoginErr('프로젝트 로드 실패: '+e.message); }
 }
 
-var _pendingLabel='';
 function enterModule(mod){
   document.getElementById('screen-module-select').style.display='none';
   document.getElementById('screen-app').style.display='flex';
@@ -3676,7 +3674,6 @@ async function doBulkUpload(){
         setPg('bulk',`[${s.school}] ${f.name}`,Math.round(done/snapshot.length*100));
       }
       try{
-        console.log('[UPLOAD]', f.name, '→', path, '| _folder:', f._folder, '| _dropFolder:', f._dropFolder, '| _sid:', f._sid);
         await uploadViaPA(paUrl,f,path);
         updateCLfromFile(f._sid,f);
         // 기타 폴더로 분류된 파일 기록 (관리자 확인용)
@@ -6242,7 +6239,6 @@ function lv2ToggleFilter(f,btn){
   }
   lv2Apply();lv2Tbl();
 }
-function lv2SetFilter(f,btn){lv2ToggleFilter(f,btn);}
 function lv2DoSearch(){lv2St.search=(document.getElementById('lv2-search').value||'').trim();lv2Apply();lv2Tbl();}
 function lv2SortBy(k){if(lv2St.sortKey===k)lv2St.sortDir*=-1;else{lv2St.sortKey=k;lv2St.sortDir=k==='age'?-1:1;}lv2Apply();lv2Tbl();}
 function lv2GP(p){lv2St.page=p;lv2Tbl();}
