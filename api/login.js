@@ -42,32 +42,26 @@ export default async function handler(req, res) {
     } catch (e) {
       return res.status(502).json({ error: '서버 연결 오류' });
     }
-    if (!indexRes.ok) return res.status(502).json({ error: '프로젝트 목록 로드 실패: HTTP ' + indexRes.status });
+    if (!indexRes.ok) return res.status(502).json({ error: '프로젝트 목록 로드 실패' });
     const projects = await indexRes.json();
     if (!Array.isArray(projects) || projects.length === 0) {
-      return res.status(502).json({ error: '프로젝트 목록 비어있음', raw: JSON.stringify(projects).substring(0, 200) });
+      return res.status(502).json({ error: '프로젝트 목록이 비어있습니다.' });
     }
 
-    const errors = [];
+    const normalId = id.normalize('NFC');
     for (const meta of projects) {
       try {
         const r = await fetch(`${RAW}/data/projects/${meta.id}.json?_=${Date.now()}`);
-        if (!r.ok) { errors.push(`${meta.id}: HTTP ${r.status}`); continue; }
+        if (!r.ok) continue;
         const proj = await r.json();
-        const normalId = id.normalize('NFC');
-        const keys = Object.keys(proj.codes || {});
-        const matchKey = keys.find(k => k.normalize('NFC') === normalId);
-        if (!matchKey) {
-          const hex = k => [...k].map(c => c.charCodeAt(0).toString(16)).join(' ');
-          errors.push(`id_hex=${hex(normalId)} first_key_hex=${keys[0]?hex(keys[0].normalize('NFC')):'none'} keys=${keys.length}`);
-        }
+        const matchKey = proj.codes ? Object.keys(proj.codes).find(k => k.normalize('NFC') === normalId) : null;
         if (matchKey) {
           const { data: token, error } = await sb.from('session_tokens').insert({
             role: 'school',
             identifier: id,
             project_id: meta.id,
           }).select('token').single();
-          if (error) return res.status(500).json({ error: 'DB오류: ' + error.message });
+          if (error) return res.status(500).json({ error: error.message });
 
           return res.json({
             token: token.token,
@@ -77,9 +71,9 @@ export default async function handler(req, res) {
             label: `학교 (${id})`,
           });
         }
-      } catch (e) { errors.push(`${meta.id}: ${e.message}`); continue; }
+      } catch (e) { continue; }
     }
-    return res.status(401).json({ error: '학교명이 올바르지 않습니다.', debug: errors });
+    return res.status(401).json({ error: '학교명이 올바르지 않습니다.' });
   }
 
   if (type === 'agency') {
