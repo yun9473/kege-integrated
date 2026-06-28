@@ -3113,7 +3113,7 @@ async function loginSchool(){
   showLoginErr('소속 프로젝트 확인 중...');
 
   try{
-    const res=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'school',id:schoolName,pw:pw})});
+    const res=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'school',id:encodeURIComponent(schoolName),pw:pw})});
     const d=await res.json();
     if(!res.ok){ showLoginErr(d.error||'로그인 실패'); return; }
     _sessionToken=d.token;
@@ -3139,7 +3139,7 @@ async function loginAgency(){
   showLoginErr('인증 중...');
 
   try{
-    const res=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'agency',id:agencyName,pw:pw})});
+    const res=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'agency',id:encodeURIComponent(agencyName),pw:pw})});
     const d=await res.json();
     if(!res.ok){ showLoginErr(d.error||'로그인 실패'); return; }
     _sessionToken=d.token;

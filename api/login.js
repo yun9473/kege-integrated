@@ -23,8 +23,10 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).end();
 
-  const body = await readBody(req);
-  const { type, id, pw } = body || {};
+  let body;
+  try { body = await readBody(req); } catch(e) { body = req.body; }
+  const { type, id: rawId, pw } = body || {};
+  const id = rawId ? decodeURIComponent(rawId) : '';
   if (!type || !id || !pw) return res.status(400).json({ error: '필수 항목 누락' });
 
   const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
