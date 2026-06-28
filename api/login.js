@@ -37,8 +37,9 @@ export default async function handler(req, res) {
         const r = await fetch(`${RAW}/data/projects/${meta.id}.json?_=${Date.now()}`);
         if (!r.ok) { errors.push(`${meta.id}: HTTP ${r.status}`); continue; }
         const proj = await r.json();
-        errors.push(`${meta.id}: codes_keys=${Object.keys(proj.codes||{}).join(',')}, match=${!!(proj.codes&&proj.codes[id])}`);
-        if (proj.codes && proj.codes[id]) {
+        const normalId = id.normalize('NFC');
+        const matchKey = proj.codes ? Object.keys(proj.codes).find(k => k.normalize('NFC') === normalId) : null;
+        if (matchKey) {
           const { data: token, error } = await sb.from('session_tokens').insert({
             role: 'school',
             identifier: id,
@@ -49,7 +50,7 @@ export default async function handler(req, res) {
           return res.json({
             token: token.token,
             role: 'school',
-            visIds: proj.codes[id],
+            visIds: proj.codes[matchKey],
             projectId: meta.id,
             label: `학교 (${id})`,
           });
@@ -71,7 +72,11 @@ export default async function handler(req, res) {
     }
     if (!indexRes.ok) return res.status(502).json({ error: '프로젝트 목록 로드 실패' });
     const projects = await indexRes.json();
-    const matching = projects.filter(p => p.교육청 === id || p.교육청.includes(id));
+    const nid = id.normalize('NFC');
+    const matching = projects.filter(p => {
+      const office = (p.교육청||'').normalize('NFC');
+      return office === nid || office.includes(nid);
+    });
     if (matching.length === 0) return res.status(401).json({ error: '해당 교육청의 프로젝트가 없습니다.' });
 
     // 토큰 발급 (프로젝트 미지정 — 클라이언트가 선택)
