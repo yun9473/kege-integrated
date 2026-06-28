@@ -1,4 +1,9 @@
+import { verifyAuth, cors } from './_auth.js';
 export default async function handler(req, res) {
+  cors(res);
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  const authUser = await verifyAuth(req);
+  if (!authUser) return res.status(401).json({ error: '인증 필요' });
   const NICE_KEY = process.env.NICE_API_KEY;
   const { q } = req.query;
   if (!q) return res.status(400).json({ error: 'q 파라미터 필요' });

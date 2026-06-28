@@ -9,6 +9,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js"></script>
 <script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=1a80e9b1baa8663a38d9433796dd9640&libraries=services,clusterer"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/gh/moonspam/NanumSquare@2.0/nanumsquare.css" rel="stylesheet">
 <style>
@@ -622,8 +623,8 @@ table.dtable tbody tr{cursor:pointer;}
         <button class="ltab" onclick="switchLTab('admin',this)"> 관리자</button>
       </div>
       <div id="lp-school">
-        <div class="fg"><label class="fl">아이디 (학교명)</label>
-          <input class="fi" id="l-sid" type="text" placeholder="예: 동성중" autocomplete="off" onkeydown="if(event.key==='Enter')document.getElementById('l-spw').focus()"/>
+        <div class="fg"><label class="fl">이메일</label>
+          <input class="fi" id="l-sid" type="email" placeholder="school@example.com" autocomplete="email" onkeydown="if(event.key==='Enter')document.getElementById('l-spw').focus()"/>
         </div>
         <div class="fg"><label class="fl">비밀번호</label>
           <input class="fi" id="l-spw" type="password" placeholder="비밀번호 입력" autocomplete="off" onkeydown="if(event.key==='Enter')loginSchool()"/>
@@ -632,8 +633,8 @@ table.dtable tbody tr{cursor:pointer;}
       </div>
       <div id="lp-agency" style="display:none">
         <div id="lp-agency-login">
-          <div class="fg"><label class="fl">아이디 (교육청명)</label>
-            <input class="fi" id="l-aid" type="text" placeholder="예: 경기도교육청" autocomplete="off" onkeydown="if(event.key==='Enter')document.getElementById('l-apw').focus()"/>
+          <div class="fg"><label class="fl">이메일</label>
+            <input class="fi" id="l-aid" type="email" placeholder="agency@example.com" autocomplete="email" onkeydown="if(event.key==='Enter')document.getElementById('l-apw').focus()"/>
           </div>
           <div class="fg"><label class="fl">비밀번호</label>
             <input class="fi" id="l-apw" type="password" placeholder="비밀번호 입력" autocomplete="off" onkeydown="if(event.key==='Enter')loginAgency()"/>
@@ -654,8 +655,8 @@ table.dtable tbody tr{cursor:pointer;}
       </div>
       <div id="lp-admin" style="display:none">
         <div id="lp-admin-login">
-          <div class="fg"><label class="fl">아이디</label>
-            <input class="fi" id="l-adid" type="text" placeholder="관리자 아이디" autocomplete="off" onkeydown="if(event.key==='Enter')document.getElementById('l-adpw').focus()"/>
+          <div class="fg"><label class="fl">이메일</label>
+            <input class="fi" id="l-adid" type="email" placeholder="admin@example.com" autocomplete="email" onkeydown="if(event.key==='Enter')document.getElementById('l-adpw').focus()"/>
           </div>
           <div class="fg"><label class="fl">비밀번호</label>
             <input class="fi" id="l-adpw" type="password" placeholder="관리자 비밀번호" autocomplete="off" onkeydown="if(event.key==='Enter')loginAdmin()"/>
@@ -978,6 +979,32 @@ table.dtable tbody tr{cursor:pointer;}
             <div class="fg"><label class="fl">관리자 비밀번호</label><input class="fi" id="a-adp" type="password" placeholder="새 비밀번호 (변경 시만 입력)"/></div>
             <button class="btn btn-p btn-sm" onclick="saveCodes()">저장</button>
           </div>
+        </div>
+
+        <div class="card" id="card-user-mgmt">
+          <div class="card-title">🔐 사용자 계정 관리 (Supabase Auth)</div>
+          <div style="font-size:12px;color:#7a7a7a;margin-bottom:12px">이메일 기반 계정을 생성하여 학교/발주청/관리자 접근을 관리합니다.</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+            <input class="fi" id="su-email" placeholder="이메일" style="flex:1;min-width:160px"/>
+            <input class="fi" id="su-pw" type="password" placeholder="비밀번호" style="width:120px"/>
+            <select class="fi" id="su-role" style="width:100px" onchange="suRoleChanged()">
+              <option value="school">학교</option>
+              <option value="agency">발주청</option>
+              <option value="admin">관리자</option>
+            </select>
+            <input class="fi" id="su-name" placeholder="표시 이름" style="width:120px"/>
+            <input class="fi" id="su-region" placeholder="관할 시도 (발주청)" style="width:120px;display:none"/>
+            <input class="fi" id="su-school-id" placeholder="학교 ID (숫자)" style="width:100px"/>
+            <button class="btn btn-p btn-sm" onclick="suCreateUser()">계정 생성</button>
+          </div>
+          <div id="su-msg" style="font-size:12px;margin-bottom:8px"></div>
+          <div style="overflow-x:auto;max-height:300px;overflow-y:auto">
+            <table class="ctbl" style="font-size:12px">
+              <thead><tr><th>이메일</th><th>역할</th><th>표시 이름</th><th>지역/학교ID</th><th>생성일</th><th></th></tr></thead>
+              <tbody id="su-tbody"></tbody>
+            </table>
+          </div>
+          <button class="btn btn-g btn-sm" style="margin-top:8px" onclick="suLoadUsers()">🔄 목록 새로고침</button>
         </div>
 
         <div class="card">
@@ -2514,6 +2541,49 @@ table.dtable tbody tr{cursor:pointer;}
 
 
 <script>
+// ═══════════════════════════════════════
+// SUPABASE 초기화
+// ═══════════════════════════════════════
+let _supabase = null;
+let _supabaseProfile = null;
+let _sessionTimer = null;
+let _lastActivity = Date.now();
+
+async function initSupabase() {
+  if (_supabase) return _supabase;
+  const res = await fetch('/api/config');
+  const cfg = await res.json();
+  if (!cfg.supabaseUrl || !cfg.supabaseAnonKey) return null;
+  _supabase = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+  return _supabase;
+}
+
+async function authFetch(url, options) {
+  options = options || {};
+  var headers = Object.assign({}, options.headers || {});
+  if (_supabase) {
+    var sess = await _supabase.auth.getSession();
+    var token = sess && sess.data && sess.data.session ? sess.data.session.access_token : '';
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+  }
+  return fetch(url, Object.assign({}, options, { headers: headers }));
+}
+
+function startSessionTimeout() {
+  _lastActivity = Date.now();
+  if (_sessionTimer) clearInterval(_sessionTimer);
+  _sessionTimer = setInterval(function() {
+    if (Date.now() - _lastActivity > 30 * 60 * 1000) {
+      clearInterval(_sessionTimer);
+      alert('30분 이상 활동이 없어 자동 로그아웃됩니다.');
+      logout();
+    }
+  }, 60000);
+  ['click', 'keydown', 'mousemove', 'scroll'].forEach(function(evt) {
+    document.addEventListener(evt, function() { _lastActivity = Date.now(); }, { passive: true });
+  });
+}
+
 // ── DOM 구조 수정: module-research를 screen-app 안으로 이동 ──
 (function(){
   var app = document.getElementById('screen-app');
@@ -3056,66 +3126,86 @@ function switchLTab(tab,el){
 }
 
 async function loginSchool(){
-  const schoolName=document.getElementById('l-sid').value.trim();
+  const email=document.getElementById('l-sid').value.trim();
   const pw=document.getElementById('l-spw').value.trim();
-  if(!schoolName){ showLoginErr('학교명을 입력하세요.'); return; }
-  if(pw!==(cfg().schoolPw||'1234')){ showLoginErr('비밀번호가 틀렸습니다.'); return; }
+  if(!email){ showLoginErr('이메일을 입력하세요.'); return; }
+  if(!pw){ showLoginErr('비밀번호를 입력하세요.'); return; }
 
   const btn=document.getElementById('btn-school-login');
-  btn.disabled=true; btn.textContent='검색 중…';
-  showLoginErr('소속 프로젝트 확인 중...');
+  btn.disabled=true; btn.textContent='로그인 중…';
+  showLoginErr('인증 중...');
 
   try{
+    await initSupabase();
+    const { data, error } = await _supabase.auth.signInWithPassword({ email, password: pw });
+    if(error){ showLoginErr('로그인 실패: ' + error.message); return; }
+    const { data: profile } = await _supabase.from('profiles').select('*').eq('id', data.user.id).single();
+    if(!profile || profile.role !== 'school'){ showLoginErr('학교 계정이 아닙니다.'); await _supabase.auth.signOut(); return; }
+    _supabaseProfile = profile;
+
     const projects=await fetchProjectIndex();
-    if(!projects){ showLoginErr('서버 연결 오류. 잠시 후 다시 시도해주세요.'); return; }
+    if(!projects){ showLoginErr('서버 연결 오류.'); return; }
     for(const meta of projects){
       try{
         const r=await fetch(`${RAW}/data/projects/${meta.id}.json?_=${Date.now()}`);
         if(!r.ok) continue;
         const proj=await r.json();
-        if(proj.codes && proj.codes[schoolName]){
-          currentProject=proj;
-          SCHOOLS=proj.schools.slice().sort((a,b)=>a.disp-b.disp);
-          DEFAULT_CODES=proj.codes||{};
-          role='school'; visIds=[...proj.codes[schoolName]];
-          clearLoginErr();
-          startApp(`학교 (${schoolName})`);
-          return;
+        const schoolEntry = proj.schools && proj.schools.find(function(s){ return s.id === profile.school_id; });
+        if(schoolEntry && proj.codes){
+          const codeName = Object.keys(proj.codes).find(function(k){ return proj.codes[k].includes(profile.school_id); });
+          if(codeName){
+            currentProject=proj;
+            SCHOOLS=proj.schools.slice().sort(function(a,b){return a.disp-b.disp;});
+            DEFAULT_CODES=proj.codes||{};
+            role='school'; visIds=[...proj.codes[codeName]];
+            clearLoginErr();
+            startSessionTimeout();
+            startApp('학교 (' + profile.display_name + ')');
+            return;
+          }
         }
-      }catch{}
+      }catch(e){}
     }
-    showLoginErr('학교명이 올바르지 않습니다.');
+    showLoginErr('소속 프로젝트를 찾을 수 없습니다.');
   }finally{
     btn.disabled=false; btn.textContent='접속하기';
   }
 }
 
 async function loginAgency(){
-  const agencyName=document.getElementById('l-aid').value.trim();
+  const email=document.getElementById('l-aid').value.trim();
   const pw=document.getElementById('l-apw').value.trim();
-  if(!agencyName){ showLoginErr('교육청명을 입력하세요.'); return; }
-  if(pw!==(cfg().agencyPw||'12345')){ showLoginErr('비밀번호가 틀렸습니다.'); return; }
+  if(!email){ showLoginErr('이메일을 입력하세요.'); return; }
+  if(!pw){ showLoginErr('비밀번호를 입력하세요.'); return; }
 
   const btn=document.getElementById('btn-agency-login');
-  btn.disabled=true; btn.textContent='확인 중…';
-  showLoginErr('프로젝트 목록 불러오는 중...');
+  btn.disabled=true; btn.textContent='로그인 중…';
+  showLoginErr('인증 중...');
 
   try{
+    await initSupabase();
+    const { data, error } = await _supabase.auth.signInWithPassword({ email, password: pw });
+    if(error){ showLoginErr('로그인 실패: ' + error.message); return; }
+    const { data: profile } = await _supabase.from('profiles').select('*').eq('id', data.user.id).single();
+    if(!profile || profile.role !== 'agency'){ showLoginErr('발주청 계정이 아닙니다.'); await _supabase.auth.signOut(); return; }
+    _supabaseProfile = profile;
+
     const projects=await fetchProjectIndex();
-    if(!projects){ showLoginErr('서버 연결 오류. 잠시 후 다시 시도해주세요.'); return; }
-    const matching=projects.filter(p=>p.교육청===agencyName||p.교육청.includes(agencyName));
+    if(!projects){ showLoginErr('서버 연결 오류.'); return; }
+    const matching=projects.filter(function(p){ return p.교육청===profile.region || (profile.region && p.교육청.includes(profile.region)); });
     if(matching.length===0){ showLoginErr('해당 교육청의 프로젝트가 없습니다.'); return; }
     clearLoginErr();
     if(matching.length===1){
       await loadProject(matching[0].id);
-      role='agency'; visIds=SCHOOLS.map(s=>s.id);
-      startApp(`발주청 (${agencyName})`);
+      role='agency'; visIds=SCHOOLS.map(function(s){return s.id;});
+      startSessionTimeout();
+      startApp('발주청 (' + profile.display_name + ')');
     } else {
       const sel=document.getElementById('l-agency-proj-sel');
       sel.innerHTML='<option value="">— 프로젝트를 선택하세요 —</option>'+
-        matching.map(p=>`<option value="${p.id}">${p.name} (${p.year})</option>`).join('');
-      document.getElementById('l-agency-authed').textContent=`${agencyName} 인증 완료`;
-      sel._agencyName=agencyName;
+        matching.map(function(p){ return '<option value="'+p.id+'">'+p.name+' ('+p.year+')</option>'; }).join('');
+      document.getElementById('l-agency-authed').textContent=profile.display_name + ' 인증 완료';
+      sel._agencyName=profile.display_name;
       document.getElementById('lp-agency-login').style.display='none';
       document.getElementById('lp-agency-proj').style.display='block';
     }
@@ -3130,38 +3220,48 @@ async function enterAgencyProject(){
   if(!id){ showLoginErr('프로젝트를 선택해주세요.'); return; }
   try{
     await loadProject(id);
-    role='agency'; visIds=SCHOOLS.map(s=>s.id);
+    role='agency'; visIds=SCHOOLS.map(function(s){return s.id;});
     clearLoginErr();
-    startApp(`발주청 (${sel._agencyName||''})`);
+    startSessionTimeout();
+    startApp('발주청 (' + (sel._agencyName||'') + ')');
   }catch(e){ showLoginErr('프로젝트 로드 실패: '+e.message); }
 }
 
 async function loginAdmin(){
-  const id=document.getElementById('l-adid').value.trim();
+  const email=document.getElementById('l-adid').value.trim();
   const pw=document.getElementById('l-adpw').value.trim();
-  if(id!==(cfg().adminId||'kege')){ showLoginErr('아이디가 틀렸습니다.'); return; }
-  if(pw!==(cfg().adminPw||'0381')){ showLoginErr('비밀번호가 틀렸습니다.'); return; }
+  if(!email){ showLoginErr('이메일을 입력하세요.'); return; }
+  if(!pw){ showLoginErr('비밀번호를 입력하세요.'); return; }
 
   const btn=document.getElementById('btn-admin-login');
-  btn.disabled=true; btn.textContent='확인 중…';
-  showLoginErr('프로젝트 목록 불러오는 중...');
+  btn.disabled=true; btn.textContent='로그인 중…';
+  showLoginErr('인증 중...');
 
   try{
+    await initSupabase();
+    const { data, error } = await _supabase.auth.signInWithPassword({ email, password: pw });
+    if(error){ showLoginErr('로그인 실패: ' + error.message); return; }
+    const { data: profile } = await _supabase.from('profiles').select('*').eq('id', data.user.id).single();
+    if(!profile || profile.role !== 'admin'){ showLoginErr('관리자 계정이 아닙니다.'); await _supabase.auth.signOut(); return; }
+    _supabaseProfile = profile;
+
     const projects=await fetchProjectIndex();
     clearLoginErr();
     if(!projects||projects.length===0){
       role='admin'; SCHOOLS=[]; DEFAULT_CODES={};
+      startSessionTimeout();
       startApp('관리자');
       return;
     }
     if(projects.length===1){
       await loadProject(projects[0].id);
-      role='admin'; visIds=SCHOOLS.map(s=>s.id);
+      role='admin'; visIds=SCHOOLS.map(function(s){return s.id;});
+      startSessionTimeout();
       startApp('관리자');
     } else {
       const sel=document.getElementById('l-admin-proj-sel');
       sel.innerHTML='<option value="">— 프로젝트를 선택하세요 (없으면 전체 관리) —</option>'+
-        projects.map(p=>`<option value="${p.id}">[${p.교육청}] ${p.name} (${p.year})</option>`).join('');
+        projects.map(function(p){ return '<option value="'+p.id+'">['+p.교육청+'] '+p.name+' ('+p.year+')</option>'; }).join('');
       document.getElementById('lp-admin-login').style.display='none';
       document.getElementById('lp-admin-proj').style.display='block';
     }
@@ -3176,8 +3276,9 @@ async function enterAdminProject(){
   try{
     if(id) await loadProject(id);
     else { currentProject=null; SCHOOLS=[]; DEFAULT_CODES={}; }
-    role='admin'; visIds=SCHOOLS.map(s=>s.id);
+    role='admin'; visIds=SCHOOLS.map(function(s){return s.id;});
     clearLoginErr();
+    startSessionTimeout();
     startApp('관리자');
   }catch(e){ showLoginErr('프로젝트 로드 실패: '+e.message); }
 }
@@ -3244,7 +3345,10 @@ async function startApp(label){
   }
 }
 
-function logout(){
+async function logout(){
+  if(_supabase) try{ await _supabase.auth.signOut(); }catch(e){}
+  if(_sessionTimer) clearInterval(_sessionTimer);
+  _supabaseProfile = null;
   localStorage.removeItem('bzSession');
   document.getElementById('screen-login').style.display='flex';
   document.getElementById('screen-app').style.display='none';
@@ -3266,6 +3370,60 @@ function logout(){
   document.getElementById('sel-panel').style.display='none';
   document.getElementById('panel-bulk').style.display='none';
   document.getElementById('panel-school').style.display='block';
+}
+
+// ════════════════════════════════════
+// SUPABASE 사용자 관리
+// ════════════════════════════════════
+function suRoleChanged(){
+  var r=document.getElementById('su-role').value;
+  document.getElementById('su-region').style.display=r==='agency'?'':'none';
+  document.getElementById('su-school-id').style.display=r==='school'?'':'none';
+}
+async function suCreateUser(){
+  var email=document.getElementById('su-email').value.trim();
+  var pw=document.getElementById('su-pw').value.trim();
+  var r=document.getElementById('su-role').value;
+  var name=document.getElementById('su-name').value.trim();
+  var region=document.getElementById('su-region').value.trim();
+  var sid=document.getElementById('su-school-id').value.trim();
+  if(!email||!pw||!name){ document.getElementById('su-msg').innerHTML='<span style="color:red">이메일, 비밀번호, 표시 이름은 필수입니다.</span>'; return; }
+  document.getElementById('su-msg').innerHTML='<span style="color:var(--blue)">생성 중...</span>';
+  try{
+    var res=await authFetch('/api/admin-users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'create',email:email,password:pw,role:r,display_name:name,region:region||null,school_id:sid||null})});
+    var d=await res.json();
+    if(d.success){
+      document.getElementById('su-msg').innerHTML='<span style="color:green">✓ 계정 생성 완료</span>';
+      document.getElementById('su-email').value=''; document.getElementById('su-pw').value=''; document.getElementById('su-name').value='';
+      suLoadUsers();
+    } else {
+      document.getElementById('su-msg').innerHTML='<span style="color:red">오류: '+d.error+'</span>';
+    }
+  }catch(e){ document.getElementById('su-msg').innerHTML='<span style="color:red">'+e.message+'</span>'; }
+}
+async function suDeleteUser(uid,email){
+  if(!confirm(email+' 계정을 삭제하시겠습니까?')) return;
+  try{
+    var res=await authFetch('/api/admin-users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'delete',userId:uid})});
+    var d=await res.json();
+    if(d.success) suLoadUsers();
+    else alert('삭제 실패: '+d.error);
+  }catch(e){ alert(e.message); }
+}
+async function suLoadUsers(){
+  var tbody=document.getElementById('su-tbody');
+  tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--gray)">로딩 중...</td></tr>';
+  try{
+    var res=await authFetch('/api/admin-users');
+    var d=await res.json();
+    if(!d.users||d.users.length===0){ tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--gray)">등록된 계정 없음</td></tr>'; return; }
+    tbody.innerHTML=d.users.map(function(u){
+      var roleLabel=u.role==='admin'?'관리자':u.role==='agency'?'발주청':'학교';
+      var extra=u.role==='agency'?(u.region||'-'):u.role==='school'?('ID:'+u.school_id):'-';
+      var dt=u.created_at?u.created_at.substring(0,10):'';
+      return '<tr><td>'+u.email+'</td><td>'+roleLabel+'</td><td>'+u.display_name+'</td><td>'+extra+'</td><td>'+dt+'</td><td><button class="btn btn-o" style="font-size:10px;padding:2px 8px" onclick="suDeleteUser(\''+u.id+'\',\''+u.email+'\')">삭제</button></td></tr>';
+    }).join('');
+  }catch(e){ tbody.innerHTML='<tr><td colspan="6" style="color:red">'+e.message+'</td></tr>'; }
 }
 
 // ════════════════════════════════════
@@ -4068,7 +4226,7 @@ async function syncPhonesToProject(){
   if(projCnt>=localCnt) return;
   try{
     currentProject.phones={...(currentProject.phones||{}), ...local};
-    await fetch('/api/save-project',{
+    await authFetch('/api/save-project',{
       method:'POST', headers:{'Content-Type':'application/json'},
       body:JSON.stringify({action:'save', id:currentProject.id, data:currentProject})
     });
@@ -4154,7 +4312,7 @@ async function fetchAllPhones(){
     try{
       const phones=JSON.parse(localStorage.getItem('bzPhones')||'{}');
       currentProject.phones={...(currentProject.phones||{}), ...phones};
-      await fetch('/api/save-project',{
+      await authFetch('/api/save-project',{
         method:'POST', headers:{'Content-Type':'application/json'},
         body:JSON.stringify({action:'save', id:currentProject.id, data:currentProject})
       });
@@ -4197,7 +4355,7 @@ async function saveDeadline(){
   currentProject.deadline=date;
   currentProject.deadlineMsg=msg;
   try{
-    await fetch('/api/save-project',{
+    await authFetch('/api/save-project',{
       method:'POST', headers:{'Content-Type':'application/json'},
       body:JSON.stringify({action:'save', id:currentProject.id, data:currentProject})
     });
@@ -4211,7 +4369,7 @@ async function clearDeadline(){
   delete currentProject.deadline;
   delete currentProject.deadlineMsg;
   try{
-    await fetch('/api/save-project',{
+    await authFetch('/api/save-project',{
       method:'POST', headers:{'Content-Type':'application/json'},
       body:JSON.stringify({action:'save', id:currentProject.id, data:currentProject})
     });
@@ -4681,7 +4839,7 @@ async function saveNewProject(){
   const status=document.getElementById('proj-save-status');
   status.textContent='저장 중…';
   try{
-    const res=await fetch('/api/save-project',{
+    const res=await authFetch('/api/save-project',{
       method:'POST', headers:{'Content-Type':'application/json'},
       body:JSON.stringify({action:'save', id, data:projectData})
     });
@@ -4716,7 +4874,7 @@ async function buildProjectList(){
 async function deleteProject(id, name){
   if(!confirm(`"${name}" 프로젝트를 삭제하시겠습니까?\n(GitHub의 파일이 삭제됩니다)`)) return;
   try{
-    const res=await fetch('/api/save-project',{
+    const res=await authFetch('/api/save-project',{
       method:'POST', headers:{'Content-Type':'application/json'},
       body:JSON.stringify({action:'delete', id})
     });
@@ -4733,20 +4891,28 @@ async function deleteProject(id, name){
 // ════════════════════════════════════
 (async function restoreSession(){
   try{
-    const s=JSON.parse(localStorage.getItem('bzSession')||'null');
-    if(!s) return;
-    // 저장된 프로젝트 복원
+    var sb = await initSupabase();
+    if(!sb) return;
+    var sess = await sb.auth.getSession();
+    if(!sess || !sess.data || !sess.data.session) return;
+    var userId = sess.data.session.user.id;
+    var prof = await sb.from('profiles').select('*').eq('id', userId).single();
+    if(!prof.data) { await sb.auth.signOut(); return; }
+    _supabaseProfile = prof.data;
+    var s = JSON.parse(localStorage.getItem('bzSession')||'null');
+    if(!s) { await sb.auth.signOut(); return; }
     if(s.projectId){
       try{
-        const r=await fetch(`${RAW}/data/projects/${s.projectId}.json?_=${Date.now()}`);
+        var r=await fetch(RAW+'/data/projects/'+s.projectId+'.json?_='+Date.now());
         if(r.ok){
           currentProject=await r.json();
-          SCHOOLS=currentProject.schools.slice().sort((a,b)=>a.disp-b.disp);
+          SCHOOLS=currentProject.schools.slice().sort(function(a,b){return a.disp-b.disp;});
           DEFAULT_CODES=currentProject.codes||{};
         }
-      }catch{}
+      }catch(e){}
     }
     role=s.role; visIds=s.visIds;
+    startSessionTimeout();
     startApp(s.label);
   }catch(e){ localStorage.removeItem('bzSession'); }
 })();
@@ -6343,7 +6509,7 @@ function hbSearchSchool() {
       _hbShowManualInput(statusEl, resultsEl, q);
       return;
     }
-    fetch('/api/school-search?q=' + encodeURIComponent(variants[idx]))
+    authFetch('/api/school-search?q=' + encodeURIComponent(variants[idx]))
       .then(function(r) { return r.json(); })
       .then(function(data) {
         var rows = data.schoolInfo && data.schoolInfo[1] && data.schoolInfo[1].row;
@@ -6384,7 +6550,7 @@ function hbFetchGrade(school) {
   var nm   = school.SCHUL_NM || '';
   var addr = school.ORG_RDNMA || school.ORG_RDNDA || '';
 
-  fetch('/api/fms-proxy?facilNm=' + encodeURIComponent(nm))
+  authFetch('/api/fms-proxy?facilNm=' + encodeURIComponent(nm))
     .then(function(r) { return r.json(); })
     .then(function(data) {
       var body = data.response && data.response.body;
@@ -6438,7 +6604,7 @@ function _hbFetchBuilding(school, statusEl, resultsEl) {
   if (siDo) qs += '&siDo=' + encodeURIComponent(siDo);
   if (siGunGu) qs += '&siGunGu=' + encodeURIComponent(siGunGu);
 
-  fetch('/api/building-search' + qs)
+  authFetch('/api/building-search' + qs)
     .then(function(r) { return r.json(); })
     .then(function(data) {
       var items = data.items || [];

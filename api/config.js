@@ -1,11 +1,15 @@
+import { cors } from './_auth.js';
 export default function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  cors(res);
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
   if (req.method === 'GET') {
     return res.status(200).json({
       paUrl: process.env.PA_URL || '',
       basePath: process.env.BASE_PATH || '',
       neisKey: process.env.NEIS_KEY || '',
+      supabaseUrl: process.env.SUPABASE_URL || '',
+      supabaseAnonKey: process.env.SUPABASE_ANON_KEY || '',
     });
   }
 

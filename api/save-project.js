@@ -1,10 +1,12 @@
+import { verifyAuth, cors } from './_auth.js';
 // Vercel 서버리스 함수: GitHub에 프로젝트 JSON 저장
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  cors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  const authUser = await verifyAuth(req);
+  if (!authUser) return res.status(401).json({ error: '인증 필요' });
+  if (authUser.role !== 'admin') return res.status(403).json({ error: '권한 없음' });
 
   const token = process.env.GITHUB_TOKEN;
   if (!token) return res.status(500).json({ error: 'GITHUB_TOKEN 미설정' });
