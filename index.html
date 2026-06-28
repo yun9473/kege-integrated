@@ -2569,6 +2569,13 @@ async function authFetch(url, options) {
   return fetch(url, Object.assign({}, options, { headers: headers }));
 }
 
+async function fetchProfile() {
+  var res = await authFetch('/api/auth-profile');
+  if (!res.ok) return null;
+  var d = await res.json();
+  return d.profile || null;
+}
+
 function startSessionTimeout() {
   _lastActivity = Date.now();
   if (_sessionTimer) clearInterval(_sessionTimer);
@@ -3139,7 +3146,7 @@ async function loginSchool(){
     await initSupabase();
     const { data, error } = await _supabase.auth.signInWithPassword({ email, password: pw });
     if(error){ showLoginErr('로그인 실패: ' + error.message); return; }
-    const { data: profile } = await _supabase.from('profiles').select('*').eq('id', data.user.id).single();
+    const profile = await fetchProfile();
     if(!profile || profile.role !== 'school'){ showLoginErr('학교 계정이 아닙니다.'); await _supabase.auth.signOut(); return; }
     _supabaseProfile = profile;
 
@@ -3186,7 +3193,7 @@ async function loginAgency(){
     await initSupabase();
     const { data, error } = await _supabase.auth.signInWithPassword({ email, password: pw });
     if(error){ showLoginErr('로그인 실패: ' + error.message); return; }
-    const { data: profile } = await _supabase.from('profiles').select('*').eq('id', data.user.id).single();
+    const profile = await fetchProfile();
     if(!profile || profile.role !== 'agency'){ showLoginErr('발주청 계정이 아닙니다.'); await _supabase.auth.signOut(); return; }
     _supabaseProfile = profile;
 
@@ -3241,7 +3248,7 @@ async function loginAdmin(){
     await initSupabase();
     const { data, error } = await _supabase.auth.signInWithPassword({ email, password: pw });
     if(error){ showLoginErr('로그인 실패: ' + error.message); return; }
-    const { data: profile } = await _supabase.from('profiles').select('*').eq('id', data.user.id).single();
+    const profile = await fetchProfile();
     if(!profile || profile.role !== 'admin'){ showLoginErr('관리자 계정이 아닙니다.'); await _supabase.auth.signOut(); return; }
     _supabaseProfile = profile;
 
@@ -4895,10 +4902,9 @@ async function deleteProject(id, name){
     if(!sb) return;
     var sess = await sb.auth.getSession();
     if(!sess || !sess.data || !sess.data.session) return;
-    var userId = sess.data.session.user.id;
-    var prof = await sb.from('profiles').select('*').eq('id', userId).single();
-    if(!prof.data) { await sb.auth.signOut(); return; }
-    _supabaseProfile = prof.data;
+    var prof = await fetchProfile();
+    if(!prof) { await sb.auth.signOut(); return; }
+    _supabaseProfile = prof;
     var s = JSON.parse(localStorage.getItem('bzSession')||'null');
     if(!s) { await sb.auth.signOut(); return; }
     if(s.projectId){
