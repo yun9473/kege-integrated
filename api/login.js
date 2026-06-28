@@ -28,19 +28,19 @@ export default async function handler(req, res) {
     if (!indexRes.ok) return res.status(502).json({ error: '프로젝트 목록 로드 실패' });
     const projects = await indexRes.json();
 
+    const errors = [];
     for (const meta of projects) {
       try {
         const r = await fetch(`${RAW}/data/projects/${meta.id}.json?_=${Date.now()}`);
-        if (!r.ok) continue;
+        if (!r.ok) { errors.push(`${meta.id}: HTTP ${r.status}`); continue; }
         const proj = await r.json();
         if (proj.codes && proj.codes[id]) {
-          // 토큰 발급
           const { data: token, error } = await sb.from('session_tokens').insert({
             role: 'school',
             identifier: id,
             project_id: meta.id,
           }).select('token').single();
-          if (error) return res.status(500).json({ error: error.message });
+          if (error) return res.status(500).json({ error: 'DB오류: ' + error.message });
 
           return res.json({
             token: token.token,
@@ -50,9 +50,9 @@ export default async function handler(req, res) {
             label: `학교 (${id})`,
           });
         }
-      } catch (e) { continue; }
+      } catch (e) { errors.push(`${meta.id}: ${e.message}`); continue; }
     }
-    return res.status(401).json({ error: '학교명이 올바르지 않습니다.' });
+    return res.status(401).json({ error: '학교명이 올바르지 않습니다.', debug: errors });
   }
 
   if (type === 'agency') {
