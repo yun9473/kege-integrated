@@ -1,6 +1,20 @@
 import { createClient } from '@supabase/supabase-js';
 
+export const config = { api: { bodyParser: false } };
+
 const RAW = 'https://raw.githubusercontent.com/yun9473/upload-system/main';
+
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on('data', c => chunks.push(c));
+    req.on('end', () => {
+      try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8'))); }
+      catch(e) { reject(e); }
+    });
+    req.on('error', reject);
+  });
+}
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -9,7 +23,8 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { type, id, pw } = req.body || {};
+  const body = await readBody(req);
+  const { type, id, pw } = body || {};
   if (!type || !id || !pw) return res.status(400).json({ error: '필수 항목 누락' });
 
   const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
