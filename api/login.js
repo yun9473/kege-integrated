@@ -38,7 +38,12 @@ export default async function handler(req, res) {
         if (!r.ok) { errors.push(`${meta.id}: HTTP ${r.status}`); continue; }
         const proj = await r.json();
         const normalId = id.normalize('NFC');
-        const matchKey = proj.codes ? Object.keys(proj.codes).find(k => k.normalize('NFC') === normalId) : null;
+        const keys = Object.keys(proj.codes || {});
+        const matchKey = keys.find(k => k.normalize('NFC') === normalId);
+        if (!matchKey) {
+          const hex = k => [...k].map(c => c.charCodeAt(0).toString(16)).join(' ');
+          errors.push(`id_hex=${hex(normalId)} first_key_hex=${keys[0]?hex(keys[0].normalize('NFC')):'none'} keys=${keys.length}`);
+        }
         if (matchKey) {
           const { data: token, error } = await sb.from('session_tokens').insert({
             role: 'school',
