@@ -7528,15 +7528,32 @@ function hwpx_parseInvestment(wb) {
 }
 
 function hwpx_parseLCC(wb) {
-  var rows = hwpx_sheetToRows(wb, 'LCC');
+  var rows = hwpx_sheetToRows(wb, 'LCC') || [];
+  if (rows.length > 1) {
+    var data = [];
+    for (var i = 1; i < rows.length; i++) {
+      if (!rows[i][0] && !rows[i][1]) continue;
+      data.push({ item: hwpx_cellVal(rows,i,0), cost: hwpx_cellVal(rows,i,1), period: hwpx_cellVal(rows,i,2), annual: hwpx_cellVal(rows,i,3) });
+    }
+    return data;
+  }
+  // 경제성 시트 파싱 (학교별 할인율 그룹)
+  rows = hwpx_sheetToRows(wb, '경제성');
+  if (!rows.length) return [];
   var data = [];
+  var curSchool = '', curBuilding = '';
   for (var i = 1; i < rows.length; i++) {
-    if (!rows[i][0] && !rows[i][1]) continue;
+    var school = hwpx_cellVal(rows,i,0);
+    var building = hwpx_cellVal(rows,i,1);
+    if (school) { curSchool = school; curBuilding = building; }
     data.push({
-      item: hwpx_cellVal(rows,i,0),
-      cost: hwpx_cellVal(rows,i,1),
-      period: hwpx_cellVal(rows,i,2),
-      annual: hwpx_cellVal(rows,i,3)
+      school: curSchool,
+      building: curBuilding || hwpx_cellVal(rows,i,1),
+      rate: hwpx_cellVal(rows,i,2),
+      rebuild: hwpx_cellVal(rows,i,3),
+      remodel: hwpx_cellVal(rows,i,4),
+      ratioText: hwpx_cellVal(rows,i,5),
+      ratio: hwpx_cellVal(rows,i,6)
     });
   }
   return data;
@@ -7694,8 +7711,28 @@ function hwpx_clearStructTable(tbls) {
 }
 
 function hwpx_fillLCCTable(tbls, data) {
+  if (!data || !data.length) return;
+  // 경제성 시트 형식 (school/building/rate/rebuild/remodel/ratio 필드가 있는 경우)
+  if (data[0].rebuild !== undefined) {
+    var tbl = hwpx_findTableByText(tbls, '경제성') || hwpx_findTableByText(tbls, 'LCC') || hwpx_findTableByPattern(tbls, ['학교','할인율','개축']);
+    if (!tbl) return;
+    var trs = hwpx_getTrs(tbl);
+    for (var i = 0; i < data.length && i + 1 < trs.length; i++) {
+      var tcs = hwpx_getTcs(trs[i + 1]);
+      var d = data[i];
+      if (tcs[0]) hwpx_setCellText(tcs[0], d.school);
+      if (tcs[1]) hwpx_setCellText(tcs[1], d.building);
+      if (tcs[2]) hwpx_setCellText(tcs[2], d.rate);
+      if (tcs[3]) hwpx_setCellText(tcs[3], hwpx_fmtNum(d.rebuild));
+      if (tcs[4]) hwpx_setCellText(tcs[4], hwpx_fmtNum(d.remodel));
+      if (tcs[5]) hwpx_setCellText(tcs[5], d.ratioText || '');
+      if (tcs[6]) hwpx_setCellText(tcs[6], d.ratio);
+    }
+    return;
+  }
+  // 기존 LCC 형식
   var tbl = hwpx_findTableByText(tbls, 'LCC') || hwpx_findTableByPattern(tbls, ['항목','비용','기간']);
-  if (!tbl || !data.length) return;
+  if (!tbl) return;
   var trs = hwpx_getTrs(tbl);
   for (var i = 0; i < data.length && i + 1 < trs.length; i++) {
     var tcs = hwpx_getTcs(trs[i + 1]);
@@ -7744,7 +7781,7 @@ async function hwpxRun() {
     var struct = hwpx_parseStructConclusion(hwpxExcelWb);
     var evalData = hwpx_parseEvalData(hwpxExcelWb);
 
-    hwpxLog('Excel 파싱 완료 — 시설 ' + facilities.length + '건, 증축 ' + extensions.length + '건');
+    hwpxLog('Excel 파싱 완료 — 시설 ' + facilities.length + '건, 증축 ' + extensions.length + '건, LCC/경제성 ' + lcc.length + '건');
 
     // Process each section XML in the HWPX zip
     var sectionFiles = [];
