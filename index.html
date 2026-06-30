@@ -7412,6 +7412,23 @@ function hwpx_setCellText(tc, text) {
     for (var i = 1; i < tNodes.length; i++) {
       tNodes[i].textContent = '';
     }
+    return;
+  }
+  // hp:t가 없는 빈 셀(서식만 있고 텍스트 노드 자체가 없는 경우) — hp:run 안에 새로 생성
+  var runs = hwpx_xpathAll(tc.ownerDocument, './/hp:run', tc);
+  if (runs.length > 0) {
+    var tNew = tc.ownerDocument.createElementNS(HWPX_HP, 'hp:t');
+    tNew.textContent = String(text);
+    runs[0].appendChild(tNew);
+  } else {
+    var ps = hwpx_xpathAll(tc.ownerDocument, './/hp:p', tc);
+    if (ps.length > 0) {
+      var run = tc.ownerDocument.createElementNS(HWPX_HP, 'hp:run');
+      var t2 = tc.ownerDocument.createElementNS(HWPX_HP, 'hp:t');
+      t2.textContent = String(text);
+      run.appendChild(t2);
+      ps[0].appendChild(run);
+    }
   }
 }
 
@@ -7696,21 +7713,68 @@ function hwpx_setConclusionCell(tc, conclusion) {
   }
 }
 
-// 대상학교 표(idx 8)에서 실제 문서 순서(학교/동 목록)를 동적으로 추출 — 학교 수 하드코딩 금지
-function hwpx_extractCanonicalOrder(ch, idx) {
-  var tbl = hwpx_xpathAll(ch[idx].ownerDocument, './/hp:tbl', ch[idx])[0];
-  if (!tbl) return [];
-  var trs = hwpx_getTrs(tbl);
-  var order = [];
-  for (var i = 1; i < trs.length; i++) {
-    var tcs = hwpx_getTcs(trs[i]);
-    if (tcs.length < 3) break;
-    var school = hwpx_getTexts(tcs[1]).trim();
-    var building = hwpx_getTexts(tcs[2]).trim();
-    if (!school || !building) break;
-    order.push({school: school, building: building});
+// 문서 전체(doc)에서 헤더 텍스트로 표를 찾음 — 위치(idx)가 아니라 내용으로 식별
+// (전체 문서/단일 표만 있는 테스트 파일 모두 동일 코드로 대응 가능)
+function hwpx_findTableBySignature(doc, predicate) {
+  var tbls = hwpx_getTbls(doc);
+  for (var i = 0; i < tbls.length; i++) {
+    if (predicate(tbls[i])) return tbls[i];
   }
-  return order;
+  return null;
+}
+function hwpx_isEconTable(tbl) {
+  var txt = hwpx_getTexts(tbl);
+  return txt.indexOf('B안/A안') >= 0 || txt.indexOf('할인율') >= 0;
+}
+function hwpx_isSchoolListTable(tbl) {
+  var txt = hwpx_getTexts(tbl);
+  return txt.indexOf('학급') >= 0 && txt.indexOf('대상동') >= 0 && txt.indexOf('위치') >= 0;
+}
+
+// 학교명/동명 lineBreak 셀(line1↵line2) 읽기 — 경제성 표의 2번째 컬럼처럼 한 셀에 둘 다 있는 경우
+function hwpx_readTwoLineCell(tc) {
+  var texts = hwpx_xpathAll(tc.ownerDocument, './/hp:t', tc);
+  if (!texts.length) return ['', ''];
+  var line1 = '', line2 = '', seenBreak = false;
+  for (var n = texts[0].firstChild; n; n = n.nextSibling) {
+    if (n.nodeType === 3) { if (seenBreak) line2 += n.textContent; else line1 += n.textContent; }
+    else if (n.nodeName === 'hp:lineBreak') seenBreak = true;
+  }
+  return [line1.trim(), line2.trim()];
+}
+
+// 대상학교 표에서 실제 문서 순서(학교/동 목록)를 동적으로 추출 — 학교 수 하드코딩 금지.
+// 대상학교 표가 없는 단일-표 테스트 파일이면 경제성 표의 7행 블록에서 순서를 역추출.
+function hwpx_extractCanonicalOrder(doc) {
+  var schoolTbl = hwpx_findTableBySignature(doc, hwpx_isSchoolListTable);
+  if (schoolTbl) {
+    var trs = hwpx_getTrs(schoolTbl);
+    var order = [];
+    for (var i = 1; i < trs.length; i++) {
+      var tcs = hwpx_getTcs(trs[i]);
+      if (tcs.length < 3) break;
+      var school = hwpx_getTexts(tcs[1]).trim();
+      var building = hwpx_getTexts(tcs[2]).trim();
+      if (!school || !building) break;
+      order.push({school: school, building: building});
+    }
+    if (order.length) return order;
+  }
+  // 폴백: 경제성 표의 7행 블록 첫 행에서 학교/동 추출
+  var econTbl = hwpx_findTableBySignature(doc, hwpx_isEconTable);
+  if (econTbl) {
+    var trsE = hwpx_getTrs(econTbl);
+    var orderE = [];
+    for (var ri = 2; ri < trsE.length; ri += 7) {
+      var tcsE = hwpx_getTcs(trsE[ri]);
+      if (tcsE.length < 2) break;
+      var pair = hwpx_readTwoLineCell(tcsE[1]);
+      if (!pair[0]) break;
+      orderE.push({school: pair[0], building: pair[1]});
+    }
+    return orderE;
+  }
+  return [];
 }
 
 function hwpx_clearRowsFrom(trs, startIdx) {
@@ -7933,8 +7997,12 @@ function hwpx_fillStructTables(ch, schools, dongNames, evalData, structConclusio
 }
 
 // === 경제성 (idx 126): 동별 7행 블록(할인율 6단계+평균) ===
-function hwpx_fillLCCTable(ch, schools, dongNames, lccData) {
-  var trs = hwpx_getTrs(hwpx_xpathAll(ch[126].ownerDocument, './/hp:tbl', ch[126])[0]);
+function hwpx_fillLCCTable(doc, ch, schools, dongNames, lccData) {
+  var econTbl = (ch[126] && hwpx_xpathAll(doc, './/hp:tbl', ch[126])[0] && hwpx_isEconTable(hwpx_xpathAll(doc, './/hp:tbl', ch[126])[0]))
+    ? hwpx_xpathAll(doc, './/hp:tbl', ch[126])[0]
+    : hwpx_findTableBySignature(doc, hwpx_isEconTable);
+  if (!econTbl) return;
+  var trs = hwpx_getTrs(econTbl);
   dongNames.forEach(function(sn, i) {
     var s = schools[i]; var base = 2 + i * 7;
     var rows = lccData[s.school + ' ' + s.building] || [];
@@ -8071,21 +8139,27 @@ async function hwpxRun() {
   hwpxSetStatus('working', '보고서 생성 중...');
 
   try {
-    var sec0Path = null, sec1Path = null;
+    // 모든 section*.xml 중 표가 가장 많이 들어있는 파일을 본문으로 사용
+    // (정식 90p 문서는 section1.xml, 단일 표 테스트 파일은 section0.xml에 내용이 있음)
+    var sectionPaths = [];
     hwpxTemplateZip.forEach(function(path) {
-      if (/Contents\/section0\.xml$/i.test(path)) sec0Path = path;
-      if (/Contents\/section1\.xml$/i.test(path)) sec1Path = path;
+      if (/Contents\/section\d+\.xml$/i.test(path)) sectionPaths.push(path);
     });
-    if (!sec1Path) throw new Error('Contents/section1.xml을 찾을 수 없습니다');
+    if (!sectionPaths.length) throw new Error('Contents/section*.xml을 찾을 수 없습니다');
 
-    var sec1Xml = await hwpxTemplateZip.file(sec1Path).async('string');
-    var sec1Doc = hwpx_parseXML(sec1Xml);
-    var ch = hwpx_getParagraphs(sec1Doc);
-    hwpxLog('section1 단락 ' + ch.length + '개 로드');
+    var sec1Path = null, sec1Doc = null, ch = [], maxTbls = -1;
+    for (var spi = 0; spi < sectionPaths.length; spi++) {
+      var xmlStr = await hwpxTemplateZip.file(sectionPaths[spi]).async('string');
+      var docCand = hwpx_parseXML(xmlStr);
+      var tblCount = hwpx_getTbls(docCand).length;
+      if (tblCount > maxTbls) { maxTbls = tblCount; sec1Path = sectionPaths[spi]; sec1Doc = docCand; }
+    }
+    ch = hwpx_getParagraphs(sec1Doc);
+    hwpxLog(sec1Path + ' 사용 (단락 ' + ch.length + '개, 표 ' + maxTbls + '개)');
 
-    // 대상학교 표(idx 8)에서 실제 학교/동 순서 동적 추출
-    var canonicalOrder = hwpx_extractCanonicalOrder(ch, 8);
-    if (!canonicalOrder.length) throw new Error('대상학교 표(8번째 단락)에서 학교 목록을 찾지 못했습니다. 템플릿 구조를 확인해주세요.');
+    // 학교/동 순서 동적 추출 — 대상학교 표 우선, 없으면 경제성 표에서 역추출
+    var canonicalOrder = hwpx_extractCanonicalOrder(sec1Doc);
+    if (!canonicalOrder.length) throw new Error('학교 목록을 찾지 못했습니다 (대상학교 표 또는 경제성 표 필요). 템플릿 구조를 확인해주세요.');
     var dongNames = canonicalOrder.map(function(o){ return o.school + ' ' + o.building; });
     hwpxLog('학교 ' + canonicalOrder.length + '개 동 확인: ' + dongNames.slice(0,3).join(', ') + (dongNames.length>3?' 외':''));
 
@@ -8096,41 +8170,36 @@ async function hwpxRun() {
     var schools = [];
     canonicalOrder.forEach(function(o) {
       var found = schoolsByKey[o.school + '|' + o.building];
-      if (found) schools.push(found);
-      else hwpxLog('!! 경고: 엑셀에서 ' + o.school + ' ' + o.building + ' 데이터를 찾을 수 없음');
+      schools.push(found || {school:o.school, building:o.building, key:o.school+'_'+o.building, establish:'', estYear:'', refYearTotal:'', areaTotal:'', class2026:'', class2030:'', student2026:'', student2030:'', safetyTiming:'', safetyGrade:''});
+      if (!found) hwpxLog('정보: 엑셀 "개요" 시트에 ' + o.school + ' ' + o.building + ' 없음 (해당 섹션만 일부 비어있을 수 있음)');
     });
 
-    var facilities = hwpx_parseFacility(hwpxExcelWb);
-    var comps = hwpx_parseComposition(hwpxExcelWb);
-    var extensions = hwpx_parseExtension(hwpxExcelWb);
-    var investments = hwpx_parseInvestment(hwpxExcelWb);
-    var lccData = hwpx_parseLCC(hwpxExcelWb);
-    var structConclusions = hwpx_parseStructConclusion(hwpxExcelWb);
-    var evalData = hwpx_parseEvalData(hwpxExcelWb, dongNames);
+    var facilities = {}, comps = [], extensions = {}, investments = {}, lccData = {}, structConclusions = {}, evalData = {};
+    try { facilities = hwpx_parseFacility(hwpxExcelWb); } catch(e) {}
+    try { comps = hwpx_parseComposition(hwpxExcelWb); } catch(e) {}
+    try { extensions = hwpx_parseExtension(hwpxExcelWb); } catch(e) {}
+    try { investments = hwpx_parseInvestment(hwpxExcelWb); } catch(e) {}
+    try { lccData = hwpx_parseLCC(hwpxExcelWb); } catch(e) {}
+    try { structConclusions = hwpx_parseStructConclusion(hwpxExcelWb); } catch(e) {}
+    try { evalData = hwpx_parseEvalData(hwpxExcelWb, dongNames); } catch(e) {}
 
     hwpxLog('Excel 파싱 완료 — 학교 ' + schools.length + '개, 평가 ' + Object.keys(evalData).length + '개, LCC ' + Object.keys(lccData).length + '개, 투자 ' + Object.keys(investments).length + '개');
 
-    // 섹션별 채우기 (idx는 06-29 서식 템플릿 구조 기준)
-    hwpxLog('대상학교 작성 중...');
-    hwpx_fillSchoolTable(ch, schools, facilities);
-    hwpxLog('시설현황 작성 중...');
-    hwpx_fillFacilityTable(ch, schools, facilities);
-    hwpxLog('구성현황 작성 중...');
-    hwpx_fillCompositionTable(ch, comps);
-    hwpxLog('투자현황 작성 중...');
-    hwpx_fillInvestmentTable(ch, schools, investments, hwpxLog);
-    hwpxLog('기능성 평가 작성 중...');
-    hwpx_fillEvalTable(ch, 89, schools, dongNames, evalData, 'func');
-    hwpxLog('성능성 평가 작성 중...');
-    hwpx_fillEvalTable(ch, 93, schools, dongNames, evalData, 'perf');
-    hwpxLog('구조안전성 작성 중...');
-    hwpx_fillStructTables(ch, schools, dongNames, evalData, structConclusions, hwpxLog);
-    hwpxLog('경제성 작성 중...');
-    hwpx_fillLCCTable(ch, schools, dongNames, lccData);
-    hwpxLog('학생배치 작성 중...');
-    hwpx_fillStudentTable(ch, schools);
-    hwpxLog('증축현황 작성 중...');
-    hwpx_fillExtensionTable(ch, schools, extensions, hwpxLog);
+    // 섹션별 채우기 — 해당 표가 템플릿에 없으면 조용히 스킵 (단일 표 테스트 파일 대응)
+    function trySection(name, fn) {
+      try { fn(); hwpxLog(name + ' 작성 완료'); }
+      catch(e) { hwpxLog(name + ' 스킵 (해당 표 없음 또는 오류: ' + e.message + ')'); }
+    }
+    trySection('대상학교', function(){ hwpx_fillSchoolTable(ch, schools, facilities); });
+    trySection('시설현황', function(){ hwpx_fillFacilityTable(ch, schools, facilities); });
+    trySection('구성현황', function(){ hwpx_fillCompositionTable(ch, comps); });
+    trySection('투자현황', function(){ hwpx_fillInvestmentTable(ch, schools, investments, hwpxLog); });
+    trySection('기능성 평가', function(){ hwpx_fillEvalTable(ch, 89, schools, dongNames, evalData, 'func'); });
+    trySection('성능성 평가', function(){ hwpx_fillEvalTable(ch, 93, schools, dongNames, evalData, 'perf'); });
+    trySection('구조안전성', function(){ hwpx_fillStructTables(ch, schools, dongNames, evalData, structConclusions, hwpxLog); });
+    trySection('경제성', function(){ hwpx_fillLCCTable(sec1Doc, ch, schools, dongNames, lccData); });
+    trySection('학생배치', function(){ hwpx_fillStudentTable(ch, schools); });
+    trySection('증축현황', function(){ hwpx_fillExtensionTable(ch, schools, extensions, hwpxLog); });
 
     var sec1Out = hwpx_serializeXML(sec1Doc);
     hwpxTemplateZip.file(sec1Path, sec1Out);
