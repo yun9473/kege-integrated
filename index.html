@@ -7372,6 +7372,7 @@ function hwpxSetStatus(type, msg) {
 
 // ── HWPX XML Utilities ──
 var HWPX_HP = 'http://www.hancom.co.kr/hwpml/2011/paragraph';
+var HWPX_HS = 'http://www.hancom.co.kr/hwpml/2011/section';
 var HWPX_XML_DECL = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
 
 function hwpx_parseXML(str) {
@@ -7383,6 +7384,7 @@ function hwpx_serializeXML(doc) {
 function hwpx_xpathAll(doc, expr, ctx) {
   var res = doc.evaluate(expr, ctx || doc, function(prefix) {
     if (prefix === 'hp') return HWPX_HP;
+    if (prefix === 'hs') return HWPX_HS;
     return null;
   }, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
   var arr = [];
@@ -7418,19 +7420,54 @@ function hwpx_clearRow(tr) {
   tcs.forEach(function(tc){ hwpx_setCellText(tc, ''); });
 }
 
-function hwpx_fmtComma(n) {
-  if (n == null || isNaN(n)) return '';
-  return Number(n).toLocaleString('ko-KR');
+// 학교명/동명처럼 <hp:t>line1<hp:lineBreak/>line2</hp:t> 구조인 셀 전용.
+// textContent 대입은 lineBreak 자식까지 지워버려 줄바꿈이 사라지므로, text 노드만 따로 다룬다.
+function hwpx_setCellTwoLines(tc, line1, line2) {
+  hwpx_removeLinesegarray(tc);
+  var tNodes = hwpx_xpathAll(tc.ownerDocument, './/hp:t', tc);
+  if (!tNodes.length) return;
+  var t0 = tNodes[0];
+  while (t0.firstChild) t0.removeChild(t0.firstChild);
+  t0.appendChild(tc.ownerDocument.createTextNode(String(line1)));
+  var lb = tc.ownerDocument.createElementNS(HWPX_HP, 'hp:lineBreak');
+  t0.appendChild(lb);
+  t0.appendChild(tc.ownerDocument.createTextNode(String(line2)));
+  for (var i = 1; i < tNodes.length; i++) tNodes[i].textContent = '';
 }
-function hwpx_fmtNum(v) {
-  if (v == null || v === '') return '';
-  var n = Number(v);
-  return isNaN(n) ? String(v) : n.toLocaleString('ko-KR');
+
+function hwpx_getParagraphs(doc) {
+  return hwpx_xpathAll(doc, '/hs:sec/hp:p');
+}
+
+// 숫자를 쉼표 포맷으로. 이미 쉼표 포함 문자열이면 그대로, 빈값은 '-'.
+function hwpx_fmtComma(val) {
+  if (val == null || val === '' || val === '-') return val ? String(val) : '-';
+  var s = String(val);
+  if (s.indexOf(',') >= 0) return s;
+  var n = parseFloat(s.replace(/,/g, ''));
+  if (isNaN(n)) return s;
+  if (n === Math.trunc(n)) return Math.trunc(n).toLocaleString('ko-KR');
+  return n.toLocaleString('ko-KR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function hwpx_fmtNum(val, dec) {
+  if (dec === undefined) dec = 2;
+  if (val == null || val === '') return '-';
+  var n = parseFloat(val);
+  if (isNaN(n)) return String(val);
+  if (dec === 0) return Math.round(n).toLocaleString('ko-KR');
+  return n.toLocaleString('ko-KR', {minimumFractionDigits:dec, maximumFractionDigits:dec});
 }
 function hwpx_fmt2(v) {
-  if (v == null || v === '') return '';
-  var n = Number(v);
-  return isNaN(n) ? String(v) : n.toFixed(2);
+  if (v == null || v === '') return '-';
+  if (typeof v === 'string') {
+    v = v.trim();
+    if (v === '-' || v === '') return v;
+    var f = parseFloat(v);
+    if (isNaN(f)) return v;
+    v = f;
+  }
+  if (typeof v === 'number') return v.toFixed(2);
+  return String(v);
 }
 
 // ── Excel parsing helpers ──
@@ -7445,322 +7482,585 @@ function hwpx_cellVal(rows, r, c) {
   return (v == null) ? '' : v;
 }
 
+// ════════════════════════════════════════════════════════
+// 개축심의요구서 전용 파싱/채우기 로직
+// (Python run_0629.py를 브라우저 JS로 이식 — 학교 수는 템플릿에서 동적 추출)
+// ════════════════════════════════════════════════════════
+
 function hwpx_parseOverview(wb) {
-  var rows = hwpx_sheetToRows(wb, '총괄');
-  if (!rows.length) return null;
-  return {
-    schoolName: hwpx_cellVal(rows,1,1),
-    address: hwpx_cellVal(rows,2,1),
-    principal: hwpx_cellVal(rows,3,1),
-    phone: hwpx_cellVal(rows,4,1),
-    totalArea: hwpx_cellVal(rows,5,1),
-    buildingCount: hwpx_cellVal(rows,6,1),
-    studentCount: hwpx_cellVal(rows,7,1),
-    classCount: hwpx_cellVal(rows,8,1),
-    established: hwpx_cellVal(rows,9,1)
-  };
+  var rows = hwpx_sheetToRows(wb, '개요');
+  var schools = [];
+  for (var i = 6; i < rows.length; i++) { // 엑셀 row7 = 배열idx6
+    var school = hwpx_cellVal(rows, i, 3);
+    if (!school) break;
+    schools.push({
+      establish: hwpx_cellVal(rows, i, 1),
+      school: school,
+      building: hwpx_cellVal(rows, i, 4),
+      estYear: hwpx_cellVal(rows, i, 6),
+      refYearTotal: hwpx_cellVal(rows, i, 7),
+      areaTotal: hwpx_cellVal(rows, i, 12),
+      class2026: hwpx_cellVal(rows, i, 14),
+      class2030: hwpx_cellVal(rows, i, 15),
+      student2026: hwpx_cellVal(rows, i, 16),
+      student2030: hwpx_cellVal(rows, i, 17),
+      safetyTiming: hwpx_cellVal(rows, i, 18),
+      safetyGrade: hwpx_cellVal(rows, i, 19),
+      key: school + '_' + hwpx_cellVal(rows, i, 4)
+    });
+  }
+  return schools;
 }
 
 function hwpx_parseFacility(wb) {
-  var rows = hwpx_sheetToRows(wb, '시설현황');
-  var data = [];
+  var rows = hwpx_sheetToRows(wb, '시설 및 심의대상 현황');
+  var facs = {};
   for (var i = 1; i < rows.length; i++) {
-    if (!rows[i][0] && !rows[i][1]) continue;
-    data.push({
-      building: hwpx_cellVal(rows,i,0),
-      floor: hwpx_cellVal(rows,i,1),
-      room: hwpx_cellVal(rows,i,2),
-      area: hwpx_cellVal(rows,i,3),
-      use: hwpx_cellVal(rows,i,4),
-      year: hwpx_cellVal(rows,i,5),
-      structure: hwpx_cellVal(rows,i,6),
-      condition: hwpx_cellVal(rows,i,7)
-    });
+    var name = hwpx_cellVal(rows, i, 0);
+    if (!name) continue;
+    facs[name] = {
+      address: hwpx_cellVal(rows, i, 1),
+      siteArea: hwpx_cellVal(rows, i, 3),
+      bldArea: hwpx_cellVal(rows, i, 4),
+      totalArea: hwpx_cellVal(rows, i, 5),
+      bcr: hwpx_cellVal(rows, i, 7),
+      legalBcr: hwpx_cellVal(rows, i, 8),
+      far: hwpx_cellVal(rows, i, 10),
+      legalFar: hwpx_cellVal(rows, i, 11),
+      note: hwpx_cellVal(rows, i, 14)
+    };
   }
-  return data;
+  return facs;
 }
 
 function hwpx_parseComposition(wb) {
-  var rows = hwpx_sheetToRows(wb, '구성비');
-  var data = [];
-  for (var i = 1; i < rows.length; i++) {
-    if (!rows[i][0] && !rows[i][1]) continue;
-    data.push({
-      category: hwpx_cellVal(rows,i,0),
-      item: hwpx_cellVal(rows,i,1),
-      area: hwpx_cellVal(rows,i,2),
-      ratio: hwpx_cellVal(rows,i,3)
+  var rows = hwpx_sheetToRows(wb, '심의대상 건물 구성현황');
+  var comps = [];
+  for (var i = 3; i < rows.length; i++) { // 엑셀 row4 = 배열idx3
+    var school = hwpx_cellVal(rows, i, 3);
+    if (!school) break;
+    comps.push({
+      school: school,
+      building: hwpx_cellVal(rows, i, 4),
+      classroom: hwpx_cellVal(rows, i, 6),
+      special: hwpx_cellVal(rows, i, 7),
+      support: hwpx_cellVal(rows, i, 8),
+      admin: hwpx_cellVal(rows, i, 9),
+      health: hwpx_cellVal(rows, i, 10),
+      totalRooms: hwpx_cellVal(rows, i, 11),
+      floor1: hwpx_cellVal(rows, i, 12),
+      floor2: hwpx_cellVal(rows, i, 13),
+      floor3: hwpx_cellVal(rows, i, 14),
+      floor4: hwpx_cellVal(rows, i, 15),
+      floorTotal: hwpx_cellVal(rows, i, 18),
+      safetyTiming: hwpx_cellVal(rows, i, 19),
+      safetyGrade: hwpx_cellVal(rows, i, 20)
     });
   }
-  return data;
+  return comps;
 }
 
 function hwpx_parseExtension(wb) {
-  var rows = hwpx_sheetToRows(wb, '증축이력');
-  var data = [];
-  for (var i = 1; i < rows.length; i++) {
-    if (!rows[i][0] && !rows[i][1]) continue;
-    data.push({
-      year: hwpx_cellVal(rows,i,0),
-      building: hwpx_cellVal(rows,i,1),
-      type: hwpx_cellVal(rows,i,2),
-      area: hwpx_cellVal(rows,i,3),
-      note: hwpx_cellVal(rows,i,4)
-    });
+  var rows = hwpx_sheetToRows(wb, '연도별증축현황');
+  var exts = {};
+  var curKey = null, curRows = [];
+  for (var i = 5; i < rows.length; i++) { // 엑셀 row6 = 배열idx5
+    var c2 = hwpx_cellVal(rows, i, 1), c3 = hwpx_cellVal(rows, i, 2);
+    var c4 = hwpx_cellVal(rows, i, 3), c5 = hwpx_cellVal(rows, i, 4);
+    var c6 = hwpx_cellVal(rows, i, 5), c7 = hwpx_cellVal(rows, i, 6);
+    var c9 = hwpx_cellVal(rows, i, 8);
+    if (c2 && c3) {
+      if (curKey && curRows.length) exts[curKey] = curRows;
+      curKey = c2 + '_' + String(c3).trim(); curRows = [];
+    }
+    if (c4 === '소계') {
+      if (c6 !== '') curRows.push({type:'subtotal', area:c6, year:c9});
+    } else if (c4 === '예시') {
+      curKey = null; curRows = [];
+    } else if (c4 !== '' && c5 !== '' && c6 !== '') {
+      curRows.push({type:'data', seq:c4, year:c5, area:c6, ratio:c7, calcYear:c9});
+    }
   }
-  return data;
+  if (curKey && curRows.length) exts[curKey] = curRows;
+  return exts;
 }
 
 function hwpx_parseInvestment(wb) {
-  var rows = hwpx_sheetToRows(wb, '투자');
-  var data = [];
-  for (var i = 1; i < rows.length; i++) {
-    if (!rows[i][0] && !rows[i][1]) continue;
-    data.push({
-      year: hwpx_cellVal(rows,i,0),
-      project: hwpx_cellVal(rows,i,1),
-      amount: hwpx_cellVal(rows,i,2),
-      source: hwpx_cellVal(rows,i,3),
-      note: hwpx_cellVal(rows,i,4)
-    });
+  var rows = hwpx_sheetToRows(wb, '보수이력');
+  var invs = {};
+  var curKey = null, curRows = [];
+  for (var i = 2; i < rows.length; i++) { // 엑셀 row3 = 배열idx2
+    var seq = hwpx_cellVal(rows, i, 0);
+    var school = hwpx_cellVal(rows, i, 1);
+    var building = hwpx_cellVal(rows, i, 2);
+    var year = hwpx_cellVal(rows, i, 3);
+    var desc = hwpx_cellVal(rows, i, 4);
+    var amount = hwpx_cellVal(rows, i, 5);
+    var note = hwpx_cellVal(rows, i, 6) || '';
+    if (seq && school && building) {
+      if (curKey && curRows.length) invs[curKey] = curRows;
+      curKey = school + '_' + building; curRows = [];
+    }
+    if (year === '합계') continue;
+    if (year && desc && amount !== '') {
+      var amt = Math.round(parseFloat(amount));
+      if (isNaN(amt)) continue;
+      var yr = (typeof year === 'number') ? String(Math.trunc(year)) : String(year);
+      curRows.push({year:yr, desc:String(desc), amount:amt, note:String(note).trim()});
+    }
   }
-  return data;
+  if (curKey && curRows.length) invs[curKey] = curRows;
+  return invs;
 }
 
 function hwpx_parseLCC(wb) {
-  var rows = hwpx_sheetToRows(wb, 'LCC') || [];
-  if (rows.length > 1) {
-    var data = [];
-    for (var i = 1; i < rows.length; i++) {
-      if (!rows[i][0] && !rows[i][1]) continue;
-      data.push({ item: hwpx_cellVal(rows,i,0), cost: hwpx_cellVal(rows,i,1), period: hwpx_cellVal(rows,i,2), annual: hwpx_cellVal(rows,i,3) });
-    }
-    return data;
-  }
-  // 경제성 시트 파싱 (학교별 할인율 그룹)
-  rows = hwpx_sheetToRows(wb, '경제성');
-  if (!rows.length) return [];
-  var data = [];
-  var curSchool = '', curBuilding = '';
+  var rows = hwpx_sheetToRows(wb, '경제성');
+  var lcc = {};
+  var curSchool = null, curBuilding = null, curRows = [];
   for (var i = 1; i < rows.length; i++) {
-    var school = hwpx_cellVal(rows,i,0);
-    var building = hwpx_cellVal(rows,i,1);
-    if (school) { curSchool = school; curBuilding = building; }
-    data.push({
-      school: curSchool,
-      building: curBuilding || hwpx_cellVal(rows,i,1),
-      rate: hwpx_cellVal(rows,i,2),
-      rebuild: hwpx_cellVal(rows,i,3),
-      remodel: hwpx_cellVal(rows,i,4),
-      ratioText: hwpx_cellVal(rows,i,5),
-      ratio: hwpx_cellVal(rows,i,6)
-    });
+    var school = hwpx_cellVal(rows, i, 0);
+    var building = hwpx_cellVal(rows, i, 1);
+    var rate = hwpx_cellVal(rows, i, 2);
+    var aCost = hwpx_cellVal(rows, i, 3);
+    var bCost = hwpx_cellVal(rows, i, 4);
+    if (school && building) {
+      if (curSchool && curRows.length) lcc[curSchool + ' ' + curBuilding] = curRows;
+      curSchool = school; curBuilding = building; curRows = [];
+    }
+    if (rate !== '' && aCost !== '' && bCost !== '') {
+      var rateF = parseFloat(rate);
+      if (isNaN(rateF)) continue; // '평균' 텍스트 행 스킵
+      curRows.push({rate:rateF, a:parseFloat(aCost), b:parseFloat(bCost)});
+    }
   }
-  return data;
+  if (curSchool && curRows.length) lcc[curSchool + ' ' + curBuilding] = curRows;
+  return lcc;
 }
 
 function hwpx_parseStructConclusion(wb) {
-  var rows = hwpx_sheetToRows(wb, '구조결론');
-  if (!rows.length || rows.length < 2) return null;
-  return {
-    grade: hwpx_cellVal(rows,1,0),
-    conclusion: hwpx_cellVal(rows,1,1),
-    recommendation: hwpx_cellVal(rows,1,2)
-  };
-}
-
-function hwpx_parseEvalData(wb) {
-  var rows = hwpx_sheetToRows(wb, '평가');
-  var data = [];
+  var rows = hwpx_sheetToRows(wb, '구조안전성에 대한 종합결론');
+  var result = {};
   for (var i = 1; i < rows.length; i++) {
-    if (!rows[i][0] && !rows[i][1]) continue;
-    data.push({
-      category: hwpx_cellVal(rows,i,0),
-      item: hwpx_cellVal(rows,i,1),
-      score: hwpx_cellVal(rows,i,2),
-      maxScore: hwpx_cellVal(rows,i,3),
-      note: hwpx_cellVal(rows,i,4)
-    });
-  }
-  return data;
-}
-
-// ── Table search & fill helpers ──
-function hwpx_findTableByText(tbls, keyword) {
-  for (var i = 0; i < tbls.length; i++) {
-    if (hwpx_getTexts(tbls[i]).indexOf(keyword) >= 0) return tbls[i];
-  }
-  return null;
-}
-
-function hwpx_findTableByPattern(tbls, patterns) {
-  for (var i = 0; i < tbls.length; i++) {
-    var txt = hwpx_getTexts(tbls[i]);
-    var found = true;
-    for (var j = 0; j < patterns.length; j++) {
-      if (txt.indexOf(patterns[j]) < 0) { found = false; break; }
+    var school = hwpx_cellVal(rows, i, 1);
+    var building = hwpx_cellVal(rows, i, 2);
+    var mainResult = hwpx_cellVal(rows, i, 3) || '';
+    var generalResult = hwpx_cellVal(rows, i, 4) || '';
+    if (school && building) {
+      result[school + ' ' + building] = {
+        main: '주요시설 점검결과: ' + mainResult,
+        general: '일반시설 점검결과: ' + generalResult
+      };
     }
-    if (found) return tbls[i];
   }
-  return null;
+  return result;
 }
 
-function hwpx_replaceTexts(doc, replacements) {
-  var tNodes = hwpx_xpathAll(doc, '//hp:t');
-  tNodes.forEach(function(t) {
-    var text = t.textContent;
-    for (var key in replacements) {
-      if (text.indexOf(key) >= 0) {
-        text = text.split(key).join(String(replacements[key]));
+var HWPX_FUNC_XL = [5,7,10,14,18,21,24,27,30,34, 35,38,40,42,44,47,50,54,56,60,61];
+var HWPX_PERF_XL = [62,68,73,75,78,84,90,95,99,104,107,112,118, 119,122,125,127,130,135,136];
+var HWPX_STRUCT_XL = [189,200,203, 204,210,215,221, 222,228, 229,234,239,244,249,254, 259,264,269,274,281, 282];
+
+function hwpx_parseEvalData(wb, dongNames) {
+  var evalData = {};
+  dongNames.forEach(function(sn) {
+    var rows = hwpx_sheetToRows(wb, sn);
+    if (!rows.length) return;
+    function rd(r) {
+      var i = r - 1; // 엑셀 1-indexed → 배열 0-indexed
+      return {
+        c8: hwpx_cellVal(rows, i, 7), c10: hwpx_cellVal(rows, i, 9), c13: hwpx_cellVal(rows, i, 12),
+        c1: String(hwpx_cellVal(rows, i, 0) || '').trim(), c2: String(hwpx_cellVal(rows, i, 1) || '').trim(),
+        c3: String(hwpx_cellVal(rows, i, 2) || '').trim(), c4: String(hwpx_cellVal(rows, i, 3) || '').trim()
+      };
+    }
+    evalData[sn] = {
+      func: HWPX_FUNC_XL.map(rd),
+      perf: HWPX_PERF_XL.map(rd),
+      struct: HWPX_STRUCT_XL.map(rd)
+    };
+  });
+  return evalData;
+}
+
+// 종합결론 셀: hp:p 2개에 각각 주요시설/일반시설 텍스트 설정
+function hwpx_setConclusionCell(tc, conclusion) {
+  var ps = hwpx_xpathAll(tc.ownerDocument, './/hp:p', tc);
+  if (ps.length >= 2) {
+    var t0 = hwpx_xpathAll(tc.ownerDocument, './/hp:t', ps[0]);
+    if (t0.length) { t0[0].textContent = conclusion.main; for (var i=1;i<t0.length;i++) t0[i].textContent=''; }
+    hwpx_removeLinesegarray(ps[0]);
+    var t1 = hwpx_xpathAll(tc.ownerDocument, './/hp:t', ps[1]);
+    if (t1.length) { t1[0].textContent = conclusion.general; for (var j=1;j<t1.length;j++) t1[j].textContent=''; }
+    hwpx_removeLinesegarray(ps[1]);
+  } else if (ps.length === 1) {
+    hwpx_setCellText(tc, conclusion.main + '\n' + conclusion.general);
+  }
+}
+
+// 대상학교 표(idx 8)에서 실제 문서 순서(학교/동 목록)를 동적으로 추출 — 학교 수 하드코딩 금지
+function hwpx_extractCanonicalOrder(ch, idx) {
+  var tbl = hwpx_xpathAll(ch[idx].ownerDocument, './/hp:tbl', ch[idx])[0];
+  if (!tbl) return [];
+  var trs = hwpx_getTrs(tbl);
+  var order = [];
+  for (var i = 1; i < trs.length; i++) {
+    var tcs = hwpx_getTcs(trs[i]);
+    if (tcs.length < 3) break;
+    var school = hwpx_getTexts(tcs[1]).trim();
+    var building = hwpx_getTexts(tcs[2]).trim();
+    if (!school || !building) break;
+    order.push({school: school, building: building});
+  }
+  return order;
+}
+
+function hwpx_clearRowsFrom(trs, startIdx) {
+  for (var i = startIdx; i < trs.length; i++) hwpx_clearRow(trs[i]);
+}
+
+// === 대상학교 (idx 8) ===
+function hwpx_fillSchoolTable(ch, schools, facilities) {
+  var trs8 = hwpx_getTrs(hwpx_xpathAll(ch[8].ownerDocument, './/hp:tbl', ch[8])[0]);
+  schools.forEach(function(s, i) {
+    if (i + 1 >= trs8.length) return;
+    var tcs = hwpx_getTcs(trs8[i + 1]);
+    var fac = facilities[s.school] || {};
+    var vals = [String(i+1), s.school, s.building, s.establish,
+      s.estYear ? String(Math.trunc(s.estYear)) : '',
+      s.refYearTotal ? String(Math.trunc(s.refYearTotal)) : '',
+      '', // 1층 기준연도 — 엑셀에 데이터 없음
+      hwpx_fmtComma(s.areaTotal), String(s.class2026 || ''), String(s.student2026 || ''),
+      fac.address || ''];
+    vals.forEach(function(v, j) { if (j < tcs.length) hwpx_setCellText(tcs[j], v); });
+  });
+  hwpx_clearRowsFrom(trs8, schools.length + 1);
+}
+
+// === 시설현황 (idx 11): 첫 동 3행, 이후 동 4행(base=4*i) ===
+function hwpx_fillFacilityTable(ch, schools, facilities) {
+  var trs13 = hwpx_getTrs(hwpx_xpathAll(ch[11].ownerDocument, './/hp:tbl', ch[11])[0]);
+  schools.forEach(function(s, i) {
+    var fac = facilities[s.school] || {};
+    var site = hwpx_fmtComma(fac.siteArea);
+    var ba = hwpx_fmtComma(fac.bldArea);
+    var bcr = fac.bcr || '-', lb = fac.legalBcr || '-';
+    var ta = hwpx_fmtComma(fac.totalArea);
+    var far = fac.far || '-', lf = fac.legalFar || '-';
+    var bcrTxt = (ba && ba !== '-') ? (ba + '(' + bcr + ' /법정' + lb + ')') : '-';
+    var farTxt = (ta && ta !== '-') ? (ta + '(' + far + ' /법정 ' + lf + ')') : '-';
+    var note = fac.note || '-';
+    var fvals = [site, '', bcrTxt, farTxt, note];
+    var subVals = ['철근콘크리트조', s.estYear ? String(Math.trunc(s.estYear)) : '',
+      s.refYearTotal ? String(Math.trunc(s.refYearTotal)) : '',
+      hwpx_fmtNum(s.areaTotal), String(s.safetyTiming || ''), String(s.safetyGrade || '')];
+    if (i === 0) {
+      if (trs13.length > 3) {
+        var tcs = hwpx_getTcs(trs13[1]);
+        hwpx_setCellText(tcs[0], '1'); hwpx_setCellText(tcs[1], s.school); hwpx_setCellText(tcs[2], s.building);
+        fvals.forEach(function(v, j) { if (j + 3 < tcs.length) hwpx_setCellText(tcs[j + 3], v); });
+        var tcs3 = hwpx_getTcs(trs13[3]);
+        subVals.forEach(function(v, j) { if (j < tcs3.length) hwpx_setCellText(tcs3[j], v); });
+      }
+    } else {
+      var base = 4 * i;
+      if (base + 3 < trs13.length) {
+        var tcsB = hwpx_getTcs(trs13[base]);
+        hwpx_setCellText(tcsB[0], String(i+1)); hwpx_setCellText(tcsB[1], s.school); hwpx_setCellText(tcsB[2], s.building);
+        var tcs1 = hwpx_getTcs(trs13[base + 1]);
+        fvals.forEach(function(v, j) { if (j < tcs1.length) hwpx_setCellText(tcs1[j], v); });
+        var tcs3b = hwpx_getTcs(trs13[base + 3]);
+        subVals.forEach(function(v, j) { if (j < tcs3b.length) hwpx_setCellText(tcs3b[j], v); });
       }
     }
-    t.textContent = text;
   });
 }
 
-function hwpx_fillSchoolTable(doc, overview) {
-  if (!overview) return;
-  hwpx_replaceTexts(doc, {
-    '{{학교명}}': overview.schoolName || '',
-    '{{주소}}': overview.address || '',
-    '{{교장}}': overview.principal || '',
-    '{{전화}}': overview.phone || '',
-    '{{총면적}}': hwpx_fmtComma(overview.totalArea),
-    '{{건물수}}': overview.buildingCount || '',
-    '{{학생수}}': hwpx_fmtComma(overview.studentCount),
-    '{{학급수}}': overview.classCount || '',
-    '{{설립일}}': overview.established || ''
-  });
-}
-
-function hwpx_fillFacilityTable(tbls, facilities) {
-  var tbl = hwpx_findTableByText(tbls, '시설현황') || hwpx_findTableByPattern(tbls, ['동','층','실']);
-  if (!tbl || !facilities.length) return;
-  var trs = hwpx_getTrs(tbl);
-  for (var i = 0; i < facilities.length && i + 1 < trs.length; i++) {
-    var tcs = hwpx_getTcs(trs[i + 1]);
-    var f = facilities[i];
-    if (tcs[0]) hwpx_setCellText(tcs[0], f.building);
-    if (tcs[1]) hwpx_setCellText(tcs[1], f.floor);
-    if (tcs[2]) hwpx_setCellText(tcs[2], f.room);
-    if (tcs[3]) hwpx_setCellText(tcs[3], hwpx_fmtNum(f.area));
-    if (tcs[4]) hwpx_setCellText(tcs[4], f.use);
-    if (tcs[5]) hwpx_setCellText(tcs[5], f.year);
-    if (tcs[6]) hwpx_setCellText(tcs[6], f.structure);
-    if (tcs[7]) hwpx_setCellText(tcs[7], f.condition);
-  }
-}
-
-function hwpx_fillCompositionTable(tbls, data) {
-  var tbl = hwpx_findTableByText(tbls, '구성비') || hwpx_findTableByPattern(tbls, ['구분','면적','비율']);
-  if (!tbl || !data.length) return;
-  var trs = hwpx_getTrs(tbl);
-  for (var i = 0; i < data.length && i + 1 < trs.length; i++) {
-    var tcs = hwpx_getTcs(trs[i + 1]);
-    var d = data[i];
-    if (tcs[0]) hwpx_setCellText(tcs[0], d.category);
-    if (tcs[1]) hwpx_setCellText(tcs[1], d.item);
-    if (tcs[2]) hwpx_setCellText(tcs[2], hwpx_fmtNum(d.area));
-    if (tcs[3]) hwpx_setCellText(tcs[3], hwpx_fmt2(d.ratio));
-  }
-}
-
-function hwpx_fillInvestmentTable(tbls, data) {
-  var tbl = hwpx_findTableByText(tbls, '투자') || hwpx_findTableByPattern(tbls, ['연도','사업','금액']);
-  if (!tbl || !data.length) return;
-  var trs = hwpx_getTrs(tbl);
-  for (var i = 0; i < data.length && i + 1 < trs.length; i++) {
-    var tcs = hwpx_getTcs(trs[i + 1]);
-    var d = data[i];
-    if (tcs[0]) hwpx_setCellText(tcs[0], d.year);
-    if (tcs[1]) hwpx_setCellText(tcs[1], d.project);
-    if (tcs[2]) hwpx_setCellText(tcs[2], hwpx_fmtComma(d.amount));
-    if (tcs[3]) hwpx_setCellText(tcs[3], d.source);
-    if (tcs[4]) hwpx_setCellText(tcs[4], d.note);
-  }
-}
-
-function hwpx_fillEvalTable(tbls, data) {
-  var tbl = hwpx_findTableByText(tbls, '평가') || hwpx_findTableByPattern(tbls, ['항목','점수','배점']);
-  if (!tbl || !data.length) return;
-  var trs = hwpx_getTrs(tbl);
-  for (var i = 0; i < data.length && i + 1 < trs.length; i++) {
-    var tcs = hwpx_getTcs(trs[i + 1]);
-    var d = data[i];
-    if (tcs[0]) hwpx_setCellText(tcs[0], d.category);
-    if (tcs[1]) hwpx_setCellText(tcs[1], d.item);
-    if (tcs[2]) hwpx_setCellText(tcs[2], hwpx_fmtNum(d.score));
-    if (tcs[3]) hwpx_setCellText(tcs[3], hwpx_fmtNum(d.maxScore));
-    if (tcs[4]) hwpx_setCellText(tcs[4], d.note);
-  }
-}
-
-function hwpx_fillStructTable(tbls, struct) {
-  if (!struct) return;
-  var tbl = hwpx_findTableByText(tbls, '구조') || hwpx_findTableByPattern(tbls, ['등급','결론']);
-  if (!tbl) return;
-  hwpx_replaceTexts(tbl.ownerDocument, {
-    '{{등급}}': struct.grade || '',
-    '{{결론}}': struct.conclusion || '',
-    '{{권고}}': struct.recommendation || ''
-  });
-}
-
-function hwpx_clearStructTable(tbls) {
-  // no-op placeholder
-}
-
-function hwpx_fillLCCTable(tbls, data) {
-  if (!data || !data.length) return;
-  // 경제성 시트 형식 (school/building/rate/rebuild/remodel/ratio 필드가 있는 경우)
-  if (data[0].rebuild !== undefined) {
-    var tbl = hwpx_findTableByText(tbls, '경제성') || hwpx_findTableByText(tbls, 'LCC') || hwpx_findTableByPattern(tbls, ['학교','할인율','개축']);
-    if (!tbl) return;
-    var trs = hwpx_getTrs(tbl);
-    for (var i = 0; i < data.length && i + 1 < trs.length; i++) {
-      var tcs = hwpx_getTcs(trs[i + 1]);
-      var d = data[i];
-      if (tcs[0]) hwpx_setCellText(tcs[0], d.school);
-      if (tcs[1]) hwpx_setCellText(tcs[1], d.building);
-      if (tcs[2]) hwpx_setCellText(tcs[2], d.rate);
-      if (tcs[3]) hwpx_setCellText(tcs[3], hwpx_fmtNum(d.rebuild));
-      if (tcs[4]) hwpx_setCellText(tcs[4], hwpx_fmtNum(d.remodel));
-      if (tcs[5]) hwpx_setCellText(tcs[5], d.ratioText || '');
-      if (tcs[6]) hwpx_setCellText(tcs[6], d.ratio);
+// === 구성현황 (idx 22): 첫 동 4행, 이후 동 5행(base=5*i) ===
+function hwpx_fillCompositionTable(ch, comps) {
+  var trs21 = hwpx_getTrs(hwpx_xpathAll(ch[22].ownerDocument, './/hp:tbl', ch[22])[0]);
+  comps.forEach(function(c, i) {
+    var rv = ['classroom','special','support','admin','health','totalRooms'].map(function(k){ return (c[k] != null && c[k] !== '') ? String(c[k]) : '-'; });
+    var fl = ['floor1','floor2','floor3','floor4','floorTotal'].map(function(k){ return (c[k] && String(c[k]) !== '-') ? String(c[k]) : '-'; });
+    var stTxt = '※ 안전등급(' + c.safetyTiming + ') : ' + c.safetyGrade;
+    if (i === 0) {
+      if (trs21.length > 4) {
+        var tcs = hwpx_getTcs(trs21[1]);
+        hwpx_setCellText(tcs[0], '1'); hwpx_setCellText(tcs[1], c.school); hwpx_setCellText(tcs[2], c.building);
+        rv.forEach(function(v, j) { if (j + 3 < tcs.length) hwpx_setCellText(tcs[j + 3], v); });
+        var tc3 = hwpx_getTcs(trs21[3]);
+        fl.forEach(function(v, j) { if (j < tc3.length) hwpx_setCellText(tc3[j], v); });
+        hwpx_setCellText(hwpx_getTcs(trs21[4])[0], stTxt);
+      }
+    } else {
+      var base = 5 * i;
+      if (base + 4 < trs21.length) {
+        var tcsB = hwpx_getTcs(trs21[base]);
+        hwpx_setCellText(tcsB[0], String(i+1)); hwpx_setCellText(tcsB[1], c.school); hwpx_setCellText(tcsB[2], c.building);
+        var tcs1 = hwpx_getTcs(trs21[base + 1]);
+        rv.forEach(function(v, j) { if (j < tcs1.length) hwpx_setCellText(tcs1[j], v); });
+        var tc3b = hwpx_getTcs(trs21[base + 3]);
+        fl.forEach(function(v, j) { if (j < tc3b.length) hwpx_setCellText(tc3b[j], v); });
+        hwpx_setCellText(hwpx_getTcs(trs21[base + 4])[0], stTxt);
+      }
     }
-    return;
-  }
-  // 기존 LCC 형식
-  var tbl = hwpx_findTableByText(tbls, 'LCC') || hwpx_findTableByPattern(tbls, ['항목','비용','기간']);
-  if (!tbl) return;
-  var trs = hwpx_getTrs(tbl);
-  for (var i = 0; i < data.length && i + 1 < trs.length; i++) {
-    var tcs = hwpx_getTcs(trs[i + 1]);
-    var d = data[i];
-    if (tcs[0]) hwpx_setCellText(tcs[0], d.item);
-    if (tcs[1]) hwpx_setCellText(tcs[1], hwpx_fmtComma(d.cost));
-    if (tcs[2]) hwpx_setCellText(tcs[2], d.period);
-    if (tcs[3]) hwpx_setCellText(tcs[3], hwpx_fmtComma(d.annual));
-  }
+  });
 }
 
-function hwpx_fillStudentTable(tbls, overview) {
-  // Uses overview data - placeholder for student-specific table
+// === 투자현황 (idx 24): 7c 시작행 + 3~4c 연속행(가변) + 3c 합계행 ===
+function hwpx_fillInvestmentTable(ch, schools, investments, logFn) {
+  var tbl24 = hwpx_xpathAll(ch[24].ownerDocument, './/hp:tbl', ch[24])[0];
+  var trs24 = hwpx_getTrs(tbl24);
+  hwpx_getTcs(trs24[0]).forEach(function(tc){ tc.setAttribute('header', '1'); });
+  var ri24 = 1;
+  var r1Bfs = hwpx_getTcs(trs24[1]).map(function(tc){ return tc.getAttribute('borderFillIDRef'); });
+  schools.forEach(function(s, i) {
+    var inv = investments[s.key] || [];
+    while (ri24 < trs24.length && hwpx_getTcs(trs24[ri24]).length < 7) ri24++;
+    if (ri24 >= trs24.length) return;
+    var tcs = hwpx_getTcs(trs24[ri24]);
+    tcs.forEach(function(tc, j) { if (j < r1Bfs.length && r1Bfs[j]) tc.setAttribute('borderFillIDRef', r1Bfs[j]); });
+    hwpx_setCellText(tcs[0], String(i+1)); hwpx_setCellText(tcs[1], s.school); hwpx_setCellText(tcs[2], s.building);
+    var filledInv = 0;
+    if (!inv.length) {
+      hwpx_setCellText(tcs[3], ''); hwpx_setCellText(tcs[4], ''); hwpx_setCellText(tcs[5], '');
+      hwpx_setCellText(tcs[6], '★ 사용자 입력 필요'); ri24++;
+    } else {
+      hwpx_setCellText(tcs[3], inv[0].year); hwpx_setCellText(tcs[4], inv[0].desc);
+      hwpx_setCellText(tcs[5], hwpx_fmtNum(inv[0].amount, 0)); hwpx_setCellText(tcs[6], inv[0].note); ri24++;
+      filledInv = 1;
+      for (var ii = 1; ii < inv.length; ii++) {
+        if (ri24 >= trs24.length) break;
+        var tc2 = hwpx_getTcs(trs24[ri24]);
+        var firstText = tc2.length ? hwpx_getTexts(tc2[0]) : '';
+        if ((tc2.length === 3 || tc2.length === 4) && firstText.indexOf('합계') < 0) {
+          hwpx_setCellText(tc2[0], inv[ii].year); hwpx_setCellText(tc2[1], inv[ii].desc);
+          hwpx_setCellText(tc2[2], hwpx_fmtNum(inv[ii].amount, 0));
+          if (tc2.length === 4) hwpx_setCellText(tc2[3], inv[ii].note);
+          ri24++; filledInv++;
+        } else break;
+      }
+      if (filledInv < inv.length && logFn) logFn('!! 경고: 투자현황 ' + s.school + ' ' + s.building + ' 행 부족 — ' + inv.length + '건 중 ' + filledInv + '건만 반영');
+    }
+    while (ri24 < trs24.length) {
+      var tcNext = hwpx_getTcs(trs24[ri24]);
+      var ft = tcNext.length ? hwpx_getTexts(tcNext[0]) : '';
+      if ((tcNext.length === 3 || tcNext.length === 4) && ft.indexOf('합계') < 0) { hwpx_clearRow(trs24[ri24]); ri24++; }
+      else break;
+    }
+    if (ri24 < trs24.length) {
+      var tc3 = hwpx_getTcs(trs24[ri24]);
+      if (tc3.length === 3) {
+        var total = inv.reduce(function(sum, r){ return sum + r.amount; }, 0);
+        hwpx_setCellText(tc3[0], '합계'); hwpx_setCellText(tc3[1], total ? hwpx_fmtNum(total, 0) : ''); hwpx_setCellText(tc3[2], '-'); ri24++;
+      }
+    }
+  });
+  hwpx_clearRowsFrom(trs24, ri24);
 }
 
-function hwpx_fillExtensionTable(tbls, data) {
-  var tbl = hwpx_findTableByText(tbls, '증축') || hwpx_findTableByPattern(tbls, ['연도','동','유형']);
-  if (!tbl || !data.length) return;
+// === 기능성(idx 89) / 성능성(idx 93): 8셀 블록시작 탐지 + lineBreak 2줄 셀 ===
+function hwpx_fillEvalTable(ch, idx, schools, dongNames, evalData, evalKey) {
+  var tbl = hwpx_xpathAll(ch[idx].ownerDocument, './/hp:tbl', ch[idx])[0];
   var trs = hwpx_getTrs(tbl);
-  for (var i = 0; i < data.length && i + 1 < trs.length; i++) {
-    var tcs = hwpx_getTcs(trs[i + 1]);
-    var d = data[i];
-    if (tcs[0]) hwpx_setCellText(tcs[0], d.year);
-    if (tcs[1]) hwpx_setCellText(tcs[1], d.building);
-    if (tcs[2]) hwpx_setCellText(tcs[2], d.type);
-    if (tcs[3]) hwpx_setCellText(tcs[3], hwpx_fmtNum(d.area));
-    if (tcs[4]) hwpx_setCellText(tcs[4], d.note);
+  var d8 = [];
+  trs.forEach(function(tr, ri) { if (hwpx_getTcs(tr).length === 8) d8.push(ri); });
+  dongNames.forEach(function(sn, i) {
+    if (i >= d8.length) return;
+    var s = schools[i]; var ed = (evalData[sn] || {})[evalKey] || [];
+    var start = d8[i], end = (i + 1 < d8.length) ? d8[i+1] : trs.length;
+    var sr = [];
+    for (var ri = start; ri < end; ri++) {
+      var tcs = hwpx_getTcs(trs[ri]);
+      if (tcs.length < 3) continue;
+      var picCount = tcs.reduce(function(n, tc){ return n + hwpx_xpathAll(tc.ownerDocument, './/hp:pic', tc).length; }, 0);
+      if (!picCount) sr.push(ri);
+    }
+    sr.forEach(function(ri, si) {
+      if (si >= ed.length) return;
+      var d = ed[si]; var tcs = hwpx_getTcs(trs[ri]); var nc = tcs.length;
+      var isSub = d.c3.indexOf('소계') >= 0 || d.c2.indexOf('소계') >= 0 || (d.c1 && !d.c2 && !d.c4);
+      var bp = hwpx_fmt2(isSub ? d.c8 : d.c10);
+      var sc = hwpx_fmt2(d.c13);
+      if (nc === 8) {
+        hwpx_setCellText(tcs[0], String(i+1));
+        hwpx_setCellTwoLines(tcs[1], s.school, s.building);
+      }
+      hwpx_setCellText(tcs[nc-2], bp); hwpx_setCellText(tcs[nc-1], sc);
+    });
+  });
+}
+
+// === 구조안전성: rowCnt=25,colCnt=8 패턴 테이블을 동적 개수만큼 수집 ===
+function hwpx_fillStructTables(ch, schools, dongNames, evalData, structConclusions, logFn) {
+  var structTbls = [];
+  for (var idx = 89; idx < ch.length && idx < 89 + schools.length * 3 + 20; idx++) {
+    hwpx_xpathAll(ch[idx].ownerDocument, './/hp:tbl', ch[idx]).forEach(function(tbl) {
+      if (tbl.getAttribute('rowCnt') === '25' && tbl.getAttribute('colCnt') === '8') structTbls.push(tbl);
+    });
+    if (structTbls.length >= schools.length) break;
   }
+  if (logFn) logFn('구조안전성 테이블 발견: ' + structTbls.length + '개 (기대값: ' + schools.length + ')');
+
+  dongNames.forEach(function(sn, i) {
+    if (i >= structTbls.length) return;
+    var s = schools[i];
+    var trs = hwpx_getTrs(structTbls[i]);
+    var ed = (evalData[sn] || {}).struct || [];
+    var dataRows = [];
+    for (var ri = 2; ri < trs.length && ri <= 22; ri++) {
+      var tcs = hwpx_getTcs(trs[ri]);
+      if (tcs.length < 3) continue;
+      var picCount = tcs.reduce(function(n, tc){ return n + hwpx_xpathAll(tc.ownerDocument, './/hp:pic', tc).length; }, 0);
+      if (!picCount) dataRows.push(ri);
+    }
+    dataRows.forEach(function(ri, si) {
+      if (si >= ed.length) return;
+      var d = ed[si]; var tcs = hwpx_getTcs(trs[ri]); var nc = tcs.length;
+      var isSub = d.c3.indexOf('소계')>=0 || d.c2.indexOf('소계')>=0 || d.c3.indexOf('총계')>=0 || d.c2.indexOf('총계')>=0;
+      var bp = hwpx_fmt2(isSub ? d.c8 : d.c10);
+      var sc = hwpx_fmt2(d.c13);
+      if (nc === 8) {
+        hwpx_setCellText(tcs[0], String(i+1));
+        hwpx_setCellTwoLines(tcs[1], s.school, s.building);
+      }
+      hwpx_setCellText(tcs[nc-2], bp); hwpx_setCellText(tcs[nc-1], sc);
+    });
+    var conclusion = structConclusions[s.school + ' ' + s.building];
+    if (trs.length > 24 && conclusion) {
+      var tcs24 = hwpx_getTcs(trs[24]);
+      if (tcs24.length >= 1) hwpx_setConclusionCell(tcs24[0], conclusion);
+    }
+  });
+}
+
+// === 경제성 (idx 126): 동별 7행 블록(할인율 6단계+평균) ===
+function hwpx_fillLCCTable(ch, schools, dongNames, lccData) {
+  var trs = hwpx_getTrs(hwpx_xpathAll(ch[126].ownerDocument, './/hp:tbl', ch[126])[0]);
+  dongNames.forEach(function(sn, i) {
+    var s = schools[i]; var base = 2 + i * 7;
+    var rows = lccData[s.school + ' ' + s.building] || [];
+    if (base >= trs.length) return;
+    var ratios = [], atSum = 0, btSum = 0;
+
+    var tcs = hwpx_getTcs(trs[base]);
+    if (tcs.length >= 6) {
+      hwpx_setCellText(tcs[0], String(i+1));
+      hwpx_setCellTwoLines(tcs[1], s.school, s.building);
+      if (rows.length) {
+        var r = rows[0];
+        hwpx_setCellText(tcs[2], '할인율 ' + (r.rate*100).toFixed(1) + '%');
+        hwpx_setCellText(tcs[3], Math.round(r.a).toLocaleString('ko-KR'));
+        hwpx_setCellText(tcs[4], Math.round(r.b).toLocaleString('ko-KR'));
+        var pct = r.b / r.a * 100; ratios.push(pct); atSum += r.a; btSum += r.b;
+        hwpx_setCellText(tcs[5], 'B안/A안 비율 ' + pct.toFixed(2) + '%');
+      }
+    }
+    for (var ri = 1; ri < 6; ri++) {
+      var ra = base + ri;
+      if (ra >= trs.length) break;
+      var tcsR = hwpx_getTcs(trs[ra]);
+      if (ri < rows.length && tcsR.length >= 4) {
+        var rr = rows[ri];
+        hwpx_setCellText(tcsR[0], '할인율 ' + (rr.rate*100).toFixed(1) + '%');
+        hwpx_setCellText(tcsR[1], Math.round(rr.a).toLocaleString('ko-KR'));
+        hwpx_setCellText(tcsR[2], Math.round(rr.b).toLocaleString('ko-KR'));
+        var pct2 = rr.b / rr.a * 100; ratios.push(pct2); atSum += rr.a; btSum += rr.b;
+        hwpx_setCellText(tcsR[3], 'B안/A안 비율 ' + pct2.toFixed(2) + '%');
+      }
+    }
+    var raAvg = base + 6;
+    if (raAvg < trs.length) {
+      var tcsAvg = hwpx_getTcs(trs[raAvg]);
+      if (tcsAvg.length >= 4 && ratios.length) {
+        var n = ratios.length;
+        var avgPct = ratios.reduce(function(a,b){return a+b;},0) / n;
+        hwpx_setCellText(tcsAvg[0], '평균');
+        hwpx_setCellText(tcsAvg[1], Math.round(atSum/n).toLocaleString('ko-KR'));
+        hwpx_setCellText(tcsAvg[2], Math.round(btSum/n).toLocaleString('ko-KR'));
+        hwpx_setCellText(tcsAvg[3], avgPct.toFixed(2) + '%');
+      }
+    }
+  });
+  hwpx_clearRowsFrom(trs, 2 + dongNames.length * 7);
+}
+
+// === 학생배치 (idx 131): 학교명 중복제거 후 i+2 오프셋 ===
+function hwpx_fillStudentTable(ch, schools) {
+  var trs120 = hwpx_getTrs(hwpx_xpathAll(ch[131].ownerDocument, './/hp:tbl', ch[131])[0]);
+  hwpx_getTcs(trs120[1]).forEach(function(tc) {
+    hwpx_xpathAll(tc.ownerDocument, './/hp:t', tc).forEach(function(t) {
+      if (t.textContent) t.textContent = t.textContent.replace('2025년','2026년').replace('2029년','2030년');
+    });
+  });
+  var seen = {}, uniq = [];
+  schools.forEach(function(s) { if (!seen[s.school]) { seen[s.school] = true; uniq.push(s); } });
+  function pc(v) { if (v == null || v === '') return 0; return parseInt(String(v).split('/')[0], 10) || 0; }
+  uniq.forEach(function(s, i) {
+    if (i + 2 >= trs120.length) return;
+    var tcs = hwpx_getTcs(trs120[i + 2]);
+    var c26 = pc(s.class2026), c30 = pc(s.class2030);
+    var s26 = pc(s.student2026), s30 = pc(s.student2030);
+    var p26 = c26 ? Math.round(s26/c26*10)/10 : 0;
+    var p30 = c30 ? Math.round(s30/c30*10)/10 : 0;
+    var diff = Math.round((p30-p26)*10)/10;
+    var ds = (diff > 0 ? '+' : '') + String(diff);
+    var vals = [String(i+1), s.school, s.establish, String(s.class2026||''), String(s.class2030||''),
+      String(s.student2026||''), String(s.student2030||''), String(p26), String(p30), ds];
+    vals.forEach(function(v, j) { if (j < tcs.length) hwpx_setCellText(tcs[j], v); });
+  });
+  hwpx_clearRowsFrom(trs120, uniq.length + 2);
+}
+
+// === 증축현황 (idx 134): 9c 시작행에 첫 데이터 포함 + 5c 연속행 ===
+function hwpx_fillExtensionTable(ch, schools, extensions, logFn) {
+  var trs122 = hwpx_getTrs(hwpx_xpathAll(ch[134].ownerDocument, './/hp:tbl', ch[134])[0]);
+  var ri95 = 1; // R0은 글로벌 헤더행이므로 스킵
+  schools.forEach(function(s, i) {
+    var ext = extensions[s.key] || [];
+    var diList = ext.filter(function(r){ return r.type === 'data'; });
+    var sub = ext.filter(function(r){ return r.type === 'subtotal'; });
+    while (ri95 < trs122.length && hwpx_getTcs(trs122[ri95]).length < 9) ri95++;
+    if (ri95 >= trs122.length) return;
+    var tcs = hwpx_getTcs(trs122[ri95]);
+    hwpx_setCellText(tcs[0], String(i+1)); hwpx_setCellText(tcs[1], s.school); hwpx_setCellText(tcs[2], s.building);
+    var di = 0;
+    if (diList.length && tcs.length >= 9) {
+      var d0 = diList[0];
+      hwpx_setCellText(tcs[3], String(d0.seq)); hwpx_setCellText(tcs[4], d0.year ? String(Math.trunc(d0.year)) : '');
+      hwpx_setCellText(tcs[5], hwpx_fmtNum(d0.area));
+      hwpx_setCellText(tcs[6], d0.ratio ? (parseFloat(d0.ratio)*100).toFixed(2) + '%' : '-');
+      hwpx_setCellText(tcs[7], d0.calcYear ? hwpx_fmtNum(d0.calcYear) : '');
+      hwpx_setCellText(tcs[8], '-');
+      di = 1;
+    }
+    ri95++;
+    while (ri95 < trs122.length && di < diList.length) {
+      var tcsR = hwpx_getTcs(trs122[ri95]); var nc = tcsR.length;
+      if (nc === 5 || nc === 6) {
+        var d = diList[di];
+        hwpx_setCellText(tcsR[0], String(d.seq)); hwpx_setCellText(tcsR[1], d.year ? String(Math.trunc(d.year)) : '');
+        hwpx_setCellText(tcsR[2], hwpx_fmtNum(d.area));
+        hwpx_setCellText(tcsR[3], d.ratio ? (parseFloat(d.ratio)*100).toFixed(2) + '%' : '-');
+        if (nc >= 5) hwpx_setCellText(tcsR[4], d.calcYear ? hwpx_fmtNum(d.calcYear) : '');
+        if (nc >= 6) hwpx_setCellText(tcsR[5], '-');
+        di++; ri95++;
+      } else break;
+    }
+    if (di < diList.length && logFn) logFn('!! 경고: 증축현황 ' + s.school + ' ' + s.building + ' 행 부족 — ' + diList.length + '건 중 ' + di + '건만 반영');
+    while (ri95 < trs122.length) {
+      var nc2 = hwpx_getTcs(trs122[ri95]).length;
+      if (nc2 === 5 || nc2 === 6) { hwpx_clearRow(trs122[ri95]); ri95++; } else break;
+    }
+    if (ri95 < trs122.length) {
+      var tcsSub = hwpx_getTcs(trs122[ri95]);
+      if (tcsSub.length === 2) {
+        hwpx_setCellText(tcsSub[0], '소계');
+        hwpx_setCellText(tcsSub[1], (sub.length && sub[0].year) ? String(Math.trunc(sub[0].year)) : '');
+        ri95++;
+      }
+    }
+    if (ri95 < trs122.length && hwpx_getTcs(trs122[ri95]).length === 1) ri95++;
+  });
+  hwpx_clearRowsFrom(trs122, ri95);
 }
 
 // ── Main HWPX Run ──
@@ -7771,50 +8071,73 @@ async function hwpxRun() {
   hwpxSetStatus('working', '보고서 생성 중...');
 
   try {
-    // Parse all Excel sheets
-    var overview = hwpx_parseOverview(hwpxExcelWb);
+    var sec0Path = null, sec1Path = null;
+    hwpxTemplateZip.forEach(function(path) {
+      if (/Contents\/section0\.xml$/i.test(path)) sec0Path = path;
+      if (/Contents\/section1\.xml$/i.test(path)) sec1Path = path;
+    });
+    if (!sec1Path) throw new Error('Contents/section1.xml을 찾을 수 없습니다');
+
+    var sec1Xml = await hwpxTemplateZip.file(sec1Path).async('string');
+    var sec1Doc = hwpx_parseXML(sec1Xml);
+    var ch = hwpx_getParagraphs(sec1Doc);
+    hwpxLog('section1 단락 ' + ch.length + '개 로드');
+
+    // 대상학교 표(idx 8)에서 실제 학교/동 순서 동적 추출
+    var canonicalOrder = hwpx_extractCanonicalOrder(ch, 8);
+    if (!canonicalOrder.length) throw new Error('대상학교 표(8번째 단락)에서 학교 목록을 찾지 못했습니다. 템플릿 구조를 확인해주세요.');
+    var dongNames = canonicalOrder.map(function(o){ return o.school + ' ' + o.building; });
+    hwpxLog('학교 ' + canonicalOrder.length + '개 동 확인: ' + dongNames.slice(0,3).join(', ') + (dongNames.length>3?' 외':''));
+
+    // 엑셀 파싱
+    var schoolsRaw = hwpx_parseOverview(hwpxExcelWb);
+    var schoolsByKey = {};
+    schoolsRaw.forEach(function(s){ schoolsByKey[s.school + '|' + s.building] = s; });
+    var schools = [];
+    canonicalOrder.forEach(function(o) {
+      var found = schoolsByKey[o.school + '|' + o.building];
+      if (found) schools.push(found);
+      else hwpxLog('!! 경고: 엑셀에서 ' + o.school + ' ' + o.building + ' 데이터를 찾을 수 없음');
+    });
+
     var facilities = hwpx_parseFacility(hwpxExcelWb);
-    var composition = hwpx_parseComposition(hwpxExcelWb);
+    var comps = hwpx_parseComposition(hwpxExcelWb);
     var extensions = hwpx_parseExtension(hwpxExcelWb);
     var investments = hwpx_parseInvestment(hwpxExcelWb);
-    var lcc = hwpx_parseLCC(hwpxExcelWb);
-    var struct = hwpx_parseStructConclusion(hwpxExcelWb);
-    var evalData = hwpx_parseEvalData(hwpxExcelWb);
+    var lccData = hwpx_parseLCC(hwpxExcelWb);
+    var structConclusions = hwpx_parseStructConclusion(hwpxExcelWb);
+    var evalData = hwpx_parseEvalData(hwpxExcelWb, dongNames);
 
-    hwpxLog('Excel 파싱 완료 — 시설 ' + facilities.length + '건, 증축 ' + extensions.length + '건, LCC/경제성 ' + lcc.length + '건');
+    hwpxLog('Excel 파싱 완료 — 학교 ' + schools.length + '개, 평가 ' + Object.keys(evalData).length + '개, LCC ' + Object.keys(lccData).length + '개, 투자 ' + Object.keys(investments).length + '개');
 
-    // Process each section XML in the HWPX zip
-    var sectionFiles = [];
-    hwpxTemplateZip.forEach(function(path) {
-      if (path.match(/Contents\/section\d+\.xml$/i)) sectionFiles.push(path);
-    });
-    hwpxLog('HWPX 섹션 파일 ' + sectionFiles.length + '개 발견');
+    // 섹션별 채우기 (idx는 06-29 서식 템플릿 구조 기준)
+    hwpxLog('대상학교 작성 중...');
+    hwpx_fillSchoolTable(ch, schools, facilities);
+    hwpxLog('시설현황 작성 중...');
+    hwpx_fillFacilityTable(ch, schools, facilities);
+    hwpxLog('구성현황 작성 중...');
+    hwpx_fillCompositionTable(ch, comps);
+    hwpxLog('투자현황 작성 중...');
+    hwpx_fillInvestmentTable(ch, schools, investments, hwpxLog);
+    hwpxLog('기능성 평가 작성 중...');
+    hwpx_fillEvalTable(ch, 89, schools, dongNames, evalData, 'func');
+    hwpxLog('성능성 평가 작성 중...');
+    hwpx_fillEvalTable(ch, 93, schools, dongNames, evalData, 'perf');
+    hwpxLog('구조안전성 작성 중...');
+    hwpx_fillStructTables(ch, schools, dongNames, evalData, structConclusions, hwpxLog);
+    hwpxLog('경제성 작성 중...');
+    hwpx_fillLCCTable(ch, schools, dongNames, lccData);
+    hwpxLog('학생배치 작성 중...');
+    hwpx_fillStudentTable(ch, schools);
+    hwpxLog('증축현황 작성 중...');
+    hwpx_fillExtensionTable(ch, schools, extensions, hwpxLog);
 
-    for (var si = 0; si < sectionFiles.length; si++) {
-      var path = sectionFiles[si];
-      var xml = await hwpxTemplateZip.file(path).async('string');
-      var doc = hwpx_parseXML(xml);
-      var tbls = hwpx_getTbls(doc);
-
-      hwpx_fillSchoolTable(doc, overview);
-      hwpx_fillFacilityTable(tbls, facilities);
-      hwpx_fillCompositionTable(tbls, composition);
-      hwpx_fillExtensionTable(tbls, extensions);
-      hwpx_fillInvestmentTable(tbls, investments);
-      hwpx_fillLCCTable(tbls, lcc);
-      hwpx_fillStructTable(tbls, struct);
-      hwpx_fillEvalTable(tbls, evalData);
-      hwpx_fillStudentTable(tbls, overview);
-
-      var out = hwpx_serializeXML(doc);
-      hwpxTemplateZip.file(path, out);
-      hwpxLog('섹션 처리 완료: ' + path);
-    }
+    var sec1Out = hwpx_serializeXML(sec1Doc);
+    hwpxTemplateZip.file(sec1Path, sec1Out);
 
     // Generate output HWPX
     var blob = await hwpxTemplateZip.generateAsync({type:'blob', mimeType:'application/hwpx'});
-    var schoolName = (overview && overview.schoolName) ? overview.schoolName : '보고서';
-    var fname = schoolName + '_보고서.hwpx';
+    var fname = '개축심의요구서_갱신.hwpx';
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url; a.download = fname; a.click();
