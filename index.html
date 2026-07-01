@@ -2646,10 +2646,13 @@ table.dtable tbody tr{cursor:pointer;}
         <div style="text-align:center;margin-bottom:24px;">
           <div style="font-size:17px;color:#7a7a7a;line-height:1.47;">대상동 기초자료를 한 곳에서 관리하고 변경이력을 기록합니다.</div>
         </div>
-        <div style="margin:0 auto 16px;display:flex;gap:8px;justify-content:flex-end;">
+        <div style="margin:0 auto 16px;display:flex;gap:8px;justify-content:flex-end;align-items:center;">
+          <div id="data-import-status" style="font-size:12px;color:#7a7a7a;"></div>
           <button class="btn btn-o btn-sm" onclick="dataOpenFieldManager()">항목 관리</button>
           <button class="btn btn-o btn-sm" onclick="dataSync().then(dataLoadBuildings)">명단 동기화</button>
           <button class="btn btn-o btn-sm" onclick="dataExportExcel()">Excel 다운로드</button>
+          <button class="btn btn-p btn-sm" onclick="document.getElementById('data-import-input').click()">Excel 업로드</button>
+          <input type="file" id="data-import-input" accept=".xlsx,.xls" style="display:none" onchange="dataImportExcel(this.files[0])">
         </div>
 
         <div id="data-field-mgr" style="display:none;margin:0 auto 16px;background:#fff;border-radius:18px;border:1px solid #e0e0e0;padding:20px;">
@@ -7789,9 +7792,11 @@ async function dataRemoveField(fieldKey){
   dataRenderFieldList();
 }
 
+var DATA_RESERVED_COLS = ['ID', '학교명', '건물동명', '최근수정', '수정자'];
+
 function dataExportExcel(){
   var rows = _dataBuildings.map(function(b){
-    var row = { 학교명: b.school_name, 건물동명: b.building_name };
+    var row = { ID: b.id, 학교명: b.school_name, 건물동명: b.building_name };
     _dataFields.forEach(function(f){
       var v = b.values[f.field_key];
       row[f.field_label] = dataFieldDisplay(f, v ? v.value : null);
@@ -7805,6 +7810,88 @@ function dataExportExcel(){
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '대상동현황');
   XLSX.writeFile(wb, '대상동현황_' + (currentProject ? currentProject.id : 'export') + '.xlsx');
+}
+
+function dataInferType(values){
+  var nonEmpty = values.filter(function(v){ return v !== ''; });
+  if (!nonEmpty.length) return 'text';
+  if (nonEmpty.every(function(v){ return v === '예' || v === '아니오'; })) return 'boolean';
+  if (nonEmpty.every(function(v){ return v !== '' && !isNaN(Number(v)); })) return 'number';
+  return 'text';
+}
+
+async function dataImportExcel(file){
+  if (!file) return;
+  var statusEl = document.getElementById('data-import-status');
+  statusEl.textContent = '읽는 중...';
+  try{
+    var buf = await file.arrayBuffer();
+    var wb = XLSX.read(buf, { type: 'array' });
+    var ws = wb.Sheets[wb.SheetNames[0]];
+    var rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    if (!rows.length) { statusEl.textContent = ''; alert('엑셀에 데이터가 없습니다'); return; }
+
+    var headers = Object.keys(rows[0]);
+    var labelToField = {};
+    _dataFields.forEach(function(f){ labelToField[f.field_label] = f; });
+    var newColumns = headers.filter(function(h){ return DATA_RESERVED_COLS.indexOf(h) === -1 && !labelToField[h]; });
+
+    for (var i = 0; i < newColumns.length; i++){
+      var col = newColumns[i];
+      statusEl.textContent = '새 항목 등록 중... (' + (i + 1) + '/' + newColumns.length + ')';
+      var colValues = rows.map(function(r){ return String(r[col] == null ? '' : r[col]).trim(); });
+      var dataType = dataInferType(colValues);
+      var key = 'custom_' + Date.now() + '_' + i;
+      await authFetch('/api/buildings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'field_add', field_key: key, field_label: col, data_type: dataType })
+      });
+      labelToField[col] = { field_key: key, field_label: col, data_type: dataType };
+    }
+
+    if (newColumns.length) await dataLoadBuildings();
+
+    var updatedCount = 0, changedValueCount = 0, skippedCount = 0;
+    for (var r = 0; r < rows.length; r++){
+      statusEl.textContent = '값 반영 중... (' + (r + 1) + '/' + rows.length + ')';
+      var row = rows[r];
+      var b = null;
+      if (row['ID']) b = _dataBuildings.find(function(x){ return x.id === String(row['ID']).trim(); });
+      if (!b) b = _dataBuildings.find(function(x){ return x.school_name === row['학교명'] && x.building_name === row['건물동명']; });
+      if (!b) { skippedCount++; continue; }
+
+      var changes = [];
+      headers.forEach(function(h){
+        if (DATA_RESERVED_COLS.indexOf(h) !== -1) return;
+        var field = labelToField[h];
+        if (!field) return;
+        var raw = String(row[h] == null ? '' : row[h]).trim();
+        if (raw === '' || raw === '-') return;
+        var newVal = field.data_type === 'boolean' ? (raw === '예' ? 'true' : raw === '아니오' ? 'false' : raw) : raw;
+        var cur = b.values[field.field_key] ? b.values[field.field_key].value : '';
+        if (newVal !== cur) changes.push({ field_name: field.field_key, new_value: newVal });
+      });
+
+      if (changes.length){
+        await authFetch('/api/buildings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'log_changes', building_id: b.id, changes: changes, source: 'Excel 업로드', note: '' })
+        });
+        updatedCount++;
+        changedValueCount += changes.length;
+      }
+    }
+
+    await dataLoadBuildings();
+    statusEl.textContent = '';
+    document.getElementById('data-import-input').value = '';
+    alert('Excel 업로드 완료\n새 항목 ' + newColumns.length + '개 등록\n' + updatedCount + '개 동 갱신 (값 ' + changedValueCount + '건)\n매칭 안 된 행 ' + skippedCount + '건');
+  }catch(e){
+    statusEl.textContent = '';
+    alert('업로드 실패: ' + e.message);
+  }
 }
 
 function hwpxHandleTemplate(file) {
