@@ -9442,6 +9442,7 @@ var _roadviewObj = null;
 var _roadviewMinimap = null;
 var _roadviewMinimapMarker = null;
 var _roadviewFullscreen = false;
+var _rvClient = null;
 
 function mapOpenRoadview(lat, lng, schoolName) {
   var panel = document.getElementById('mapRoadviewPanel');
@@ -9449,58 +9450,68 @@ function mapOpenRoadview(lat, lng, schoolName) {
   var msg = document.getElementById('mapRoadviewMsg');
   var title = document.getElementById('mapRoadviewTitle');
 
-  panel.style.display = 'flex';
   title.textContent = schoolName + ' 로드뷰';
   msg.style.display = 'none';
   container.style.display = 'block';
+  panel.style.display = 'flex';
+  if (_mapObj) _mapObj.relayout();
 
-  if (!_roadviewObj) {
-    _roadviewObj = new kakao.maps.Roadview(container);
-  }
-
-  var rvClient = new kakao.maps.RoadviewClient();
+  if (!_rvClient) _rvClient = new kakao.maps.RoadviewClient();
   var pos = new kakao.maps.LatLng(lat, lng);
 
-  rvClient.getNearestPanoId(pos, 200, function(panoId) {
-    if (panoId === null) {
-      container.style.display = 'none';
-      msg.style.display = 'block';
-      return;
-    }
-    _roadviewObj.setPanoId(panoId, pos);
-
-    // 미니맵 초기화
-    var minimapEl = document.getElementById('mapRoadviewMinimap');
-    if (!_roadviewMinimap) {
-      _roadviewMinimap = new kakao.maps.Map(minimapEl, {
-        center: pos, level: 3
-      });
-      _roadviewMinimapMarker = new kakao.maps.Marker({
-        position: pos,
-        map: _roadviewMinimap,
-        draggable: true
-      });
-      // 핀 드래그 → 로드뷰 위치 이동
-      kakao.maps.event.addListener(_roadviewMinimapMarker, 'dragend', function() {
-        var newPos = _roadviewMinimapMarker.getPosition();
-        rvClient.getNearestPanoId(newPos, 200, function(pid) {
-          if (pid) _roadviewObj.setPanoId(pid, newPos);
-        });
-      });
-      // 로드뷰 시점 변경 → 미니맵 마커 이동
+  // 레이아웃 확정 후 Roadview 초기화
+  setTimeout(function() {
+    if (!_roadviewObj) {
+      _roadviewObj = new kakao.maps.Roadview(container);
+      // 로드뷰 위치 변경 → 미니맵 마커 동기화
       kakao.maps.event.addListener(_roadviewObj, 'position_changed', function() {
+        if (!_roadviewMinimapMarker) return;
         var rvPos = _roadviewObj.getPosition();
         _roadviewMinimapMarker.setPosition(rvPos);
         _roadviewMinimap.setCenter(rvPos);
       });
-    } else {
-      _roadviewMinimap.setCenter(pos);
-      _roadviewMinimapMarker.setPosition(pos);
-      _roadviewMinimap.relayout();
     }
-  });
 
-  if (_mapObj) _mapObj.relayout();
+    _rvClient.getNearestPanoId(pos, 200, function(panoId) {
+      if (panoId === null) {
+        container.style.display = 'none';
+        msg.style.display = 'block';
+        return;
+      }
+      _roadviewObj.setPanoId(panoId, pos);
+
+      // 미니맵
+      var minimapEl = document.getElementById('mapRoadviewMinimap');
+      setTimeout(function() {
+        if (!_roadviewMinimap) {
+          _roadviewMinimap = new kakao.maps.Map(minimapEl, { center: pos, level: 3 });
+          _roadviewMinimapMarker = new kakao.maps.Marker({ position: pos, map: _roadviewMinimap, draggable: true });
+          kakao.maps.event.addListener(_roadviewMinimapMarker, 'dragend', function() {
+            var newPos = _roadviewMinimapMarker.getPosition();
+            _rvClient.getNearestPanoId(newPos, 200, function(pid) {
+              if (pid) _roadviewObj.setPanoId(pid, newPos);
+            });
+          });
+        } else {
+          _roadviewMinimap.setCenter(pos);
+          _roadviewMinimapMarker.setPosition(pos);
+          _roadviewMinimap.relayout();
+        }
+      }, 100);
+    });
+  }, 80);
+}
+
+function mapRvRelayout() {
+  setTimeout(function() {
+    if (_roadviewObj) {
+      var c = document.getElementById('mapRoadviewContainer');
+      // Kakao Roadview resize: recreate if needed, otherwise trigger
+      kakao.maps.event.trigger(_roadviewObj, 'resize');
+    }
+    if (_roadviewMinimap) _roadviewMinimap.relayout();
+    if (_mapObj) _mapObj.relayout();
+  }, 220);
 }
 
 function mapToggleRoadviewFullscreen() {
@@ -9516,9 +9527,7 @@ function mapToggleRoadviewFullscreen() {
     panel.style.borderLeft = '1px solid #e0e0e0';
     btn.textContent = '⛶';
   }
-  if (_mapObj) _mapObj.relayout();
-  if (_roadviewMinimap) _roadviewMinimap.relayout();
-  if (_roadviewObj) kakao.maps.event.trigger(_roadviewObj, 'resize');
+  mapRvRelayout();
 }
 
 function mapCloseRoadview() {
