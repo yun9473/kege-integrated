@@ -2260,13 +2260,21 @@ table.dtable tbody tr{cursor:pointer;}
         <button onclick="mapToggleFullscreen()" id="mapFullscreenBtn" style="padding:7px 12px;font-size:11px;font-weight:600;border:none;cursor:pointer;background:#fff;color:#1d1d1f;font-family:inherit;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,0.12);">⛶ 전체화면</button>
       </div>
       <!-- 로드뷰 패널 -->
-      <div id="mapRoadviewPanel" style="display:none;position:absolute;top:0;right:0;width:380px;height:100%;background:#fff;border-left:1px solid #e0e0e0;z-index:20;flex-direction:column;">
+      <div id="mapRoadviewPanel" style="display:none;position:absolute;top:0;right:0;width:420px;height:100%;background:#fff;border-left:1px solid #e0e0e0;z-index:20;flex-direction:column;transition:width 0.2s;">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid #eee;flex-shrink:0;">
           <div id="mapRoadviewTitle" style="font-size:13px;font-weight:700;color:#1d1d1f;">로드뷰</div>
-          <button onclick="mapCloseRoadview()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#999;line-height:1;">×</button>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <button id="mapRvFullscreenBtn" onclick="mapToggleRoadviewFullscreen()" title="전체화면" style="background:none;border:none;font-size:15px;cursor:pointer;color:#666;line-height:1;">⛶</button>
+            <button onclick="mapCloseRoadview()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#999;line-height:1;">×</button>
+          </div>
         </div>
-        <div id="mapRoadviewContainer" style="flex:1;"></div>
+        <div id="mapRoadviewContainer" style="flex:1;min-height:0;"></div>
         <div id="mapRoadviewMsg" style="display:none;padding:24px;text-align:center;font-size:12px;color:#999;">이 위치의 로드뷰를 찾을 수 없습니다.</div>
+        <!-- 미니맵 -->
+        <div style="height:180px;flex-shrink:0;border-top:1px solid #eee;position:relative;">
+          <div id="mapRoadviewMinimap" style="width:100%;height:100%;"></div>
+          <div style="position:absolute;bottom:6px;left:8px;font-size:10px;color:#555;background:rgba(255,255,255,0.85);padding:2px 6px;border-radius:4px;">핀을 드래그해 위치 이동</div>
+        </div>
       </div>
       <!-- 드래그앤드롭 오버레이 -->
       <div id="mapDropOverlay" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,102,204,0.12);border:3px dashed var(--blue);z-index:30;pointer-events:none;align-items:center;justify-content:center;">
@@ -9290,6 +9298,9 @@ function mapCloseSchoolList() {
 }
 
 var _roadviewObj = null;
+var _roadviewMinimap = null;
+var _roadviewMinimapMarker = null;
+var _roadviewFullscreen = false;
 
 function mapOpenRoadview(lat, lng, schoolName) {
   var panel = document.getElementById('mapRoadviewPanel');
@@ -9313,17 +9324,69 @@ function mapOpenRoadview(lat, lng, schoolName) {
     if (panoId === null) {
       container.style.display = 'none';
       msg.style.display = 'block';
+      return;
+    }
+    _roadviewObj.setPanoId(panoId, pos);
+
+    // 미니맵 초기화
+    var minimapEl = document.getElementById('mapRoadviewMinimap');
+    if (!_roadviewMinimap) {
+      _roadviewMinimap = new kakao.maps.Map(minimapEl, {
+        center: pos, level: 3
+      });
+      _roadviewMinimapMarker = new kakao.maps.Marker({
+        position: pos,
+        map: _roadviewMinimap,
+        draggable: true
+      });
+      // 핀 드래그 → 로드뷰 위치 이동
+      kakao.maps.event.addListener(_roadviewMinimapMarker, 'dragend', function() {
+        var newPos = _roadviewMinimapMarker.getPosition();
+        rvClient.getNearestPanoId(newPos, 200, function(pid) {
+          if (pid) _roadviewObj.setPanoId(pid, newPos);
+        });
+      });
+      // 로드뷰 시점 변경 → 미니맵 마커 이동
+      kakao.maps.event.addListener(_roadviewObj, 'position_changed', function() {
+        var rvPos = _roadviewObj.getPosition();
+        _roadviewMinimapMarker.setPosition(rvPos);
+        _roadviewMinimap.setCenter(rvPos);
+      });
     } else {
-      _roadviewObj.setPanoId(panoId, pos);
+      _roadviewMinimap.setCenter(pos);
+      _roadviewMinimapMarker.setPosition(pos);
+      _roadviewMinimap.relayout();
     }
   });
 
   if (_mapObj) _mapObj.relayout();
 }
 
+function mapToggleRoadviewFullscreen() {
+  var panel = document.getElementById('mapRoadviewPanel');
+  var btn = document.getElementById('mapRvFullscreenBtn');
+  _roadviewFullscreen = !_roadviewFullscreen;
+  if (_roadviewFullscreen) {
+    panel.style.width = '100%';
+    panel.style.borderLeft = 'none';
+    btn.textContent = '⊠';
+  } else {
+    panel.style.width = '420px';
+    panel.style.borderLeft = '1px solid #e0e0e0';
+    btn.textContent = '⛶';
+  }
+  if (_mapObj) _mapObj.relayout();
+  if (_roadviewMinimap) _roadviewMinimap.relayout();
+  if (_roadviewObj) kakao.maps.event.trigger(_roadviewObj, 'resize');
+}
+
 function mapCloseRoadview() {
   var panel = document.getElementById('mapRoadviewPanel');
   panel.style.display = 'none';
+  _roadviewFullscreen = false;
+  panel.style.width = '420px';
+  panel.style.borderLeft = '1px solid #e0e0e0';
+  document.getElementById('mapRvFullscreenBtn').textContent = '⛶';
   if (_mapObj) _mapObj.relayout();
 }
 
