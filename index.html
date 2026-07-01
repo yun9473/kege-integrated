@@ -2954,10 +2954,10 @@ async function flushCLSync(){
   _clPendingSync = {};
   if (!items.length) return;
   try{
-    await authFetch('/api/checklist', {
+    await authFetch('/api/project-data', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'bulk_set', project_id: currentProject.id, items: items })
+      body: JSON.stringify({ action: 'checklist_bulk_set', project_id: currentProject.id, items: items })
     });
   }catch(e){}
 }
@@ -2965,7 +2965,7 @@ async function flushCLSync(){
 async function clHydrateFromServer(){
   if (!currentProject) return;
   try{
-    var r = await authFetch('/api/checklist?project_id=' + encodeURIComponent(currentProject.id));
+    var r = await authFetch('/api/project-data?action=checklist&project_id=' + encodeURIComponent(currentProject.id));
     if (!r.ok) return;
     var d = await r.json();
     var rows = d.items || [];
