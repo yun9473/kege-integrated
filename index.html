@@ -8501,11 +8501,74 @@ function mapCreateMarker(d) {
             (b.risk ? b.risk.total + '점' : '-') + '</span>' +
         '</span></div>';
     });
-    iwHtml += '</div></div>';
+    iwHtml += '</div>';
+    // 용도지역 섹션 — 비동기 조회 후 교체
+    iwHtml += '<div id="iw-zoning-' + d.school + '" style="margin-top:8px;padding-top:6px;border-top:1px solid #eee;font-size:11px;color:#888;">용도지역 조회 중...</div>';
+    iwHtml += '</div>';
     _globalInfoWindow.setContent(iwHtml);
     _globalInfoWindow.open(_mapObj, marker);
+    // 용도지역 비동기 조회
+    mapFetchZoning(d.lat, d.lng, d.school);
   });
   return marker;
+}
+
+var _ZONING_RULES = {
+  '제1종전용주거지역':  { bcr: 50,  far: 100 },
+  '제2종전용주거지역':  { bcr: 50,  far: 150 },
+  '제1종일반주거지역':  { bcr: 60,  far: 200 },
+  '제2종일반주거지역':  { bcr: 60,  far: 250 },
+  '제3종일반주거지역':  { bcr: 50,  far: 300 },
+  '준주거지역':         { bcr: 70,  far: 500 },
+  '중심상업지역':       { bcr: 90,  far: 1500 },
+  '일반상업지역':       { bcr: 80,  far: 1300 },
+  '근린상업지역':       { bcr: 70,  far: 900 },
+  '유통상업지역':       { bcr: 80,  far: 1100 },
+  '전용공업지역':       { bcr: 70,  far: 300 },
+  '일반공업지역':       { bcr: 70,  far: 350 },
+  '준공업지역':         { bcr: 70,  far: 400 },
+  '보전녹지지역':       { bcr: 20,  far: 80 },
+  '생산녹지지역':       { bcr: 20,  far: 100 },
+  '자연녹지지역':       { bcr: 20,  far: 100 },
+  '보전관리지역':       { bcr: 20,  far: 80 },
+  '생산관리지역':       { bcr: 20,  far: 80 },
+  '계획관리지역':       { bcr: 40,  far: 100 },
+  '농림지역':           { bcr: 20,  far: 80 },
+  '자연환경보전지역':   { bcr: 20,  far: 80 },
+};
+
+var _zoningCache = {};
+
+function mapFetchZoning(lat, lng, schoolKey) {
+  if (_zoningCache[schoolKey]) {
+    mapRenderZoning(schoolKey, _zoningCache[schoolKey]);
+    return;
+  }
+  fetch('/api/vworld?lat=' + lat + '&lng=' + lng)
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var result = d.found ? d.uqName : null;
+      _zoningCache[schoolKey] = result;
+      mapRenderZoning(schoolKey, result);
+    })
+    .catch(function() { mapRenderZoning(schoolKey, null); });
+}
+
+function mapRenderZoning(schoolKey, uqName) {
+  var el = document.getElementById('iw-zoning-' + schoolKey);
+  if (!el) return;
+  if (!uqName) {
+    el.innerHTML = '<span style="color:#aaa;">용도지역 정보 없음</span>';
+    return;
+  }
+  var rule = _ZONING_RULES[uqName];
+  var ruleHtml = rule
+    ? '<span style="color:#555;">건폐율 <b>' + rule.bcr + '%</b> 이하 &nbsp;·&nbsp; 용적률 <b>' + rule.far + '%</b> 이하</span>'
+    : '<span style="color:#aaa;">법규 정보 없음</span>';
+  el.innerHTML =
+    '<div style="font-size:10px;font-weight:600;color:#3a7bd5;margin-bottom:2px;">' + uqName + '</div>' +
+    '<div style="font-size:10px;">' + ruleHtml + '</div>' +
+    '<div style="font-size:9px;color:#aaa;margin-top:2px;">국토계획법 시행령 기준 (법정 상한)</div>';
 }
 
 var _mapViewTimer = null;
