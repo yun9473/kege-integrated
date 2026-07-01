@@ -2165,6 +2165,7 @@ table.dtable tbody tr{cursor:pointer;}
       </label>
       <button class="btn btn-o btn-sm" onclick="mapClearData()">초기화</button>
       <span id="mapDataCount" style="font-size:11px;color:var(--gray);"></span>
+      <span id="mapSavedLabel" style="display:none;font-size:11px;color:#059669;"></span>
     </div>
   </div>
 
@@ -5305,7 +5306,11 @@ function switchTab(id,el){
   });
   if(el) el.classList.add('active');
   if(newId==='search') renderDetailTable('all');
-  if(newId==='map'){ setTimeout(function(){ mapInitKakao().then(function(){ if(_mapObj) _mapObj.relayout(); }); },200); }
+  if(newId==='map'){ setTimeout(function(){ mapInitKakao().then(function(){
+    if(_mapObj) _mapObj.relayout();
+    if(_mapData.length === 0) mapAutoRestore();
+    else mapUpdateSavedLabel();
+  }); },200); }
   if(newId==='edu'&&!_eduInitDone){
     var firstChip=document.querySelector('.edu-chip');
     if(firstChip) firstChip.click();
@@ -8361,11 +8366,38 @@ function mapParseSido(address) {
   return '기타';
 }
 
+// ── IndexedDB 엑셀 영속화 ──
+function mapIDB(mode) {
+  return new Promise(function(resolve, reject) {
+    var req = indexedDB.open('kege_map', 1);
+    req.onupgradeneeded = function(e) { e.target.result.createObjectStore('files'); };
+    req.onsuccess = function(e) {
+      var db = e.target.result;
+      resolve(db.transaction('files', mode).objectStore('files'));
+    };
+    req.onerror = reject;
+  });
+}
+function mapSaveExcelIDB(buf, name) {
+  mapIDB('readwrite').then(function(store) { store.put({ buf: buf, name: name, ts: Date.now() }, 'mapExcel'); }).catch(function(){});
+}
+function mapLoadExcelIDB(cb) {
+  mapIDB('readonly').then(function(store) {
+    var req = store.get('mapExcel');
+    req.onsuccess = function(e) { cb(e.target.result || null); };
+    req.onerror = function() { cb(null); };
+  }).catch(function() { cb(null); });
+}
+function mapClearExcelIDB() {
+  mapIDB('readwrite').then(function(store) { store.delete('mapExcel'); }).catch(function(){});
+}
+
 function mapLoadExcel(input) {
   var f = input.files[0]; if (!f) return;
   mapShowLoading('파일 읽는 중', f.name + ' (' + (f.size/1024/1024).toFixed(1) + 'MB)', 2);
   var reader = new FileReader();
   reader.onload = function(e) {
+    mapSaveExcelIDB(e.target.result, f.name);
     var wb = XLSX.read(e.target.result, { type: 'array' });
     var ws = wb.Sheets[wb.SheetNames[0]];
     var rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
@@ -8447,8 +8479,117 @@ function mapLoadExcel(input) {
     mapInitKakao().then(function() {
       mapRenderMarkers();
     });
+    mapUpdateSavedLabel();
   };
   reader.readAsArrayBuffer(f);
+}
+
+function mapUpdateSavedLabel() {
+  mapLoadExcelIDB(function(saved) {
+    var el = document.getElementById('mapSavedLabel');
+    if (!el) return;
+    if (saved) {
+      var d = new Date(saved.ts);
+      var label = saved.name + ' (' + (d.getMonth()+1) + '/' + d.getDate() + ' ' + d.getHours() + ':' + String(d.getMinutes()).padStart(2,'0') + ')';
+      el.textContent = '💾 ' + label;
+      el.style.display = 'inline';
+    } else {
+      el.style.display = 'none';
+    }
+  });
+}
+
+function mapAutoRestore() {
+  mapLoadExcelIDB(function(saved) {
+    if (!saved || !saved.buf) return;
+    mapShowLoading('저장된 데이터 복원 중', saved.name, 2);
+    var wb = XLSX.read(saved.buf, { type: 'array' });
+    // mapLoadExcel의 파싱 로직 재사용 — 가상 이벤트로 트리거
+    var fakeInput = { files: [new File([saved.buf], saved.name)] };
+    // 직접 파싱 (FileReader 없이 ArrayBuffer 재사용)
+    var ws = wb.Sheets[wb.SheetNames[0]];
+    var rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    var evt = { target: { result: saved.buf } };
+    // mapLoadExcel reader.onload 로직을 직접 호출하기 위해 임시 input 생성
+    var dt = new DataTransfer();
+    dt.items.add(new File([saved.buf], saved.name, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    var fakeEl = { files: dt.files };
+    mapLoadExcelFromBuffer(saved.buf, saved.name);
+  });
+}
+
+function mapLoadExcelFromBuffer(buf, fname) {
+  mapShowLoading('파일 읽는 중', fname, 2);
+  var wb = XLSX.read(buf, { type: 'array' });
+  var ws = wb.Sheets[wb.SheetNames[0]];
+  var rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+  var colMap = { school: null, address: null, grade: null, year: null, building: null, type: null, area: null };
+  if (rows.length > 0) {
+    var keys = Object.keys(rows[0]);
+    keys.forEach(function(k) {
+      var kl = k.replace(/\s/g,'');
+      if (kl === '학교명') colMap.school = k;
+      if (kl.includes('주소') || kl.includes('소재지') || kl === '도로명주소') colMap.address = k;
+      if (kl === '안전등급') colMap.grade = k;
+      if (kl === '안전등급_건물명') colMap.building = k;
+      if (kl === '준공연도' || kl === '설립연도' || kl === '건축연도') colMap.year = k;
+      if (kl === '사업유형' || kl === '유형') colMap.type = k;
+      if (kl === '연면적') colMap.area = k;
+      if (!colMap.building && (kl.includes('건물') || kl.includes('동명') || kl.includes('대상동'))) colMap.building = k;
+      if (!colMap.school && kl.includes('학교')) colMap.school = k;
+    });
+  }
+
+  _mapData = rows.map(function(r, i) {
+    var schoolRaw = colMap.school ? String(r[colMap.school] || '') : '';
+    var address = colMap.address ? String(r[colMap.address] || '') : '';
+    var gradeRaw = colMap.grade ? String(r[colMap.grade] || '') : '';
+    var year = colMap.year ? r[colMap.year] : null;
+    var building = colMap.building ? String(r[colMap.building] || '') : '';
+    var type = colMap.type ? String(r[colMap.type] || '') : '';
+    var area = colMap.area ? r[colMap.area] : null;
+    var grade = gradeRaw.replace(/등급/g, '').replace(/\s/g, '').toUpperCase();
+    if (!['A','B','C','D','E'].includes(grade)) grade = '';
+    if (year && typeof year === 'number') year = Math.floor(year);
+    else if (year) { var ym = String(year).match(/\d{4}/); year = ym ? parseInt(ym[0]) : null; }
+    var school = schoolRaw;
+    if (!building && schoolRaw) {
+      var parts = schoolRaw.match(/^(.+?(?:학교|고등학교|중학교|초등학교))\s*(.*)/);
+      if (parts) { school = parts[1]; if (parts[2]) building = parts[2]; }
+    }
+    var risk = (grade || year) ? mapCalcRisk(grade, year) : null;
+    return {
+      id: i, school: school, building: building, address: address,
+      grade: grade, year: year, type: type, area: area,
+      sido: mapParseSido(address),
+      risk: risk,
+      gradeInfo: risk ? mapGetGrade(risk.total) : { label: '미분류', color: '#7a7a7a', key: 'unknown' }
+    };
+  }).filter(function(d) { return d.school || d.address; });
+
+  var schoolGroup = {};
+  _mapData.forEach(function(d) {
+    var key = d.school + '|' + d.address;
+    if (!schoolGroup[key]) schoolGroup[key] = [];
+    schoolGroup[key].push(d);
+  });
+  _mapSchools = [];
+  for (var sk in schoolGroup) {
+    var group = schoolGroup[sk];
+    group.sort(function(a, b) { return (b.risk ? b.risk.total : 0) - (a.risk ? a.risk.total : 0); });
+    var rep = group[0];
+    rep._allBuildings = group;
+    rep._buildingCount = group.length;
+    _mapSchools.push(rep);
+  }
+  mapShowLoading('데이터 복원 완료', _mapData.length + '건 → ' + _mapSchools.length + '교', 10);
+  document.getElementById('mapEmptyMsg').style.display = 'none';
+  mapBuildSidoFilters();
+  mapUpdateStats();
+  mapBuildRegionDashboard();
+  mapInitKakao().then(function() { mapRenderMarkers(); });
+  mapUpdateSavedLabel();
 }
 
 // 시도별 대략 중심 좌표 (Geocoder 폴백용)
@@ -9825,6 +9966,8 @@ function mapClearData() {
   document.getElementById('mapDataCount').textContent = '';
   document.getElementById('mapSidoFilters').innerHTML = '';
   document.getElementById('mapExcelFile').value = '';
+  mapClearExcelIDB();
+  mapUpdateSavedLabel();
 }
 
 // 드래그앤드롭
