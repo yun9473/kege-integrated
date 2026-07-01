@@ -14,7 +14,10 @@ export default async function handler(req, res) {
 
   try {
     const r = await fetch(url);
-    if (!r.ok) return res.status(502).json({ error: 'vworld error', status: r.status });
+    if (!r.ok) {
+      const body = await r.text().catch(() => '');
+      return res.status(502).json({ error: 'vworld error', status: r.status, body, url: url.replace(key, 'HIDDEN') });
+    }
     const data = await r.json();
 
     const features = data?.features || [];
