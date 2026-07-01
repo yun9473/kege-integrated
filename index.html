@@ -8502,13 +8502,13 @@ function mapCreateMarker(d) {
         '</span></div>';
     });
     iwHtml += '</div>';
-    var zoningHtml = '<div style="margin-top:8px;padding-top:6px;border-top:1px solid #eee;font-size:11px;color:#888;">용도지역 조회 중...</div>';
-    _globalInfoWindow.setContent(iwHtml + zoningHtml + '</div>');
+    // V-World 바로가기 버튼
+    var vworldBtn = '<div style="margin-top:8px;padding-top:6px;border-top:1px solid #eee;">' +
+      '<a href="https://map.vworld.kr/map/maps.do?coord=' + d.lng + ',' + d.lat + '&zoom=5&maplevel=10&basemap=GRAPHIC&overlays=UQIZONE" ' +
+      'target="_blank" style="display:inline-block;font-size:10px;color:#3a7bd5;text-decoration:none;padding:3px 8px;border:1px solid #3a7bd5;border-radius:4px;">' +
+      'V-World에서 보기 ↗</a></div>';
+    _globalInfoWindow.setContent(iwHtml + vworldBtn + '</div>');
     _globalInfoWindow.open(_mapObj, marker);
-    // 용도지역 비동기 조회 — 완료 후 setContent로 전체 교체
-    mapFetchZoning(d.lat, d.lng, d.school, function(zoningSection) {
-      _globalInfoWindow.setContent(iwHtml + zoningSection + '</div>');
-    });
   });
   return marker;
 }
@@ -8541,10 +8541,31 @@ var _zoningCache = {};
 var _vworldKey = null;
 
 function mapGetVworldKey() {
-  if (_vworldKey) return Promise.resolve(_vworldKey);
+  if (_vworldKey !== null) return Promise.resolve(_vworldKey);
   return fetch('/api/config').then(function(r) { return r.json(); }).then(function(cfg) {
     _vworldKey = cfg.vworldKey || '';
     return _vworldKey;
+  });
+}
+
+function mapVworldGeocode(addr, cb) {
+  mapGetVworldKey().then(function(key) {
+    if (!key) { cb(null, null); return; }
+    var url = 'https://api.vworld.kr/req/address?service=address&request=getcoord&version=2.0' +
+      '&crs=epsg:4326&refine=true&simple=false&format=json&type=road' +
+      '&address=' + encodeURIComponent(addr) + '&key=' + key;
+    fetch(url).then(function(r) { return r.json(); }).then(function(d) {
+      var pt = d?.response?.result?.point;
+      if (pt) cb(parseFloat(pt.y), parseFloat(pt.x));
+      else {
+        // 도로명 실패 → 지번 주소로 재시도
+        var url2 = url.replace('type=road', 'type=parcel');
+        fetch(url2).then(function(r2) { return r2.json(); }).then(function(d2) {
+          var pt2 = d2?.response?.result?.point;
+          pt2 ? cb(parseFloat(pt2.y), parseFloat(pt2.x)) : cb(null, null);
+        }).catch(function() { cb(null, null); });
+      }
+    }).catch(function() { cb(null, null); });
   });
 }
 
@@ -8666,8 +8687,16 @@ function mapRenderMarkers() {
               _mapGeoCache[addr] = [lt, ln];
               uniqueAddrs[addr].forEach(function(d) { d.lat = lt; d.lng = ln; });
             } else {
-              var sc = _sidoCenter[mapParseSido(addr)] || _sidoCenter['미분류'];
-              uniqueAddrs[addr].forEach(function(d) { d.lat = sc[0]+(Math.random()-0.5)*0.2; d.lng = sc[1]+(Math.random()-0.5)*0.2; });
+              // 카카오 실패 → V-World 지오코더 폴백
+              mapVworldGeocode(addr, function(lt, ln) {
+                if (lt && ln) {
+                  _mapGeoCache[addr] = [lt, ln];
+                  uniqueAddrs[addr].forEach(function(d) { d.lat = lt; d.lng = ln; });
+                } else {
+                  var sc = _sidoCenter[mapParseSido(addr)] || _sidoCenter['미분류'];
+                  uniqueAddrs[addr].forEach(function(d) { d.lat = sc[0]+(Math.random()-0.5)*0.2; d.lng = sc[1]+(Math.random()-0.5)*0.2; });
+                }
+              });
             }
           });
         })(addrList[i]);
