@@ -65,6 +65,17 @@ export default async function handler(req, res) {
       return res.json({ success: true });
     }
 
+    if (action === 'set_permission') {
+      const { can_edit_basic_data } = req.body;
+      if (!userId || typeof can_edit_basic_data !== 'boolean') {
+        return res.status(400).json({ error: 'userId/can_edit_basic_data 필요' });
+      }
+      const { error } = await supabase.from('profiles')
+        .update({ can_edit_basic_data: can_edit_basic_data }).eq('id', userId);
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json({ success: true });
+    }
+
     return res.status(400).json({ error: 'unknown action' });
   }
 

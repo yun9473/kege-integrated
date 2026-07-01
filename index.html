@@ -1014,6 +1014,7 @@ table.dtable tbody tr{cursor:pointer;}
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
           <button class="btn btn-o btn-sm" onclick="exportExcel()" id="btn-excel-status" style="display:none">Excel 다운로드</button>
         </div>
+        <div id="stage2-panel"></div>
         <div class="sgrid" id="stat-grid"></div>
         <div class="ov-card">
           <div class="ov-card-title">전체 대상교 체크리스트</div>
@@ -1100,7 +1101,7 @@ table.dtable tbody tr{cursor:pointer;}
           <div id="su-msg" style="font-size:12px;margin-bottom:8px"></div>
           <div style="overflow-x:auto;max-height:300px;overflow-y:auto">
             <table class="ctbl" style="font-size:12px">
-              <thead><tr><th>이메일</th><th>역할</th><th>표시 이름</th><th>지역/학교ID</th><th>생성일</th><th></th></tr></thead>
+              <thead><tr><th>이메일</th><th>역할</th><th>표시 이름</th><th>지역/학교ID</th><th>생성일</th><th>기초자료 2단계</th><th></th></tr></thead>
               <tbody id="su-tbody"></tbody>
             </table>
           </div>
@@ -2670,36 +2671,37 @@ table.dtable tbody tr{cursor:pointer;}
         </div>
       </div>
 
-      <div id="data-modal-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:9999;align-items:center;justify-content:center;">
-        <div style="background:#fff;border-radius:18px;padding:24px;max-width:480px;width:90%;max-height:85vh;overflow-y:auto;">
-          <div id="data-modal-title" style="font-size:16px;font-weight:700;color:#1d1d1f;margin-bottom:16px;"></div>
-          <input type="hidden" id="data-modal-building-id">
-          <div id="data-modal-fields"></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0;">
-            <select id="data-modal-source" style="padding:8px;border-radius:8px;border:1px solid #e0e0e0;">
-              <option value="현장조사">현장조사</option>
-              <option value="기초자료">기초자료</option>
-              <option value="교육청회신">교육청회신</option>
-            </select>
-            <input id="data-modal-note" placeholder="근거/메모" style="padding:8px;border-radius:8px;border:1px solid #e0e0e0;">
-          </div>
-          <div style="display:flex;gap:8px;justify-content:flex-end;">
-            <button class="btn btn-o btn-sm" onclick="dataCloseModal()">취소</button>
-            <button class="btn btn-p btn-sm" onclick="dataSubmitModal()">저장</button>
-          </div>
-        </div>
-      </div>
+    </div>
+  </div>
 
-      <div id="data-history-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:9999;align-items:center;justify-content:center;">
-        <div style="background:#fff;border-radius:18px;padding:24px;max-width:520px;width:90%;max-height:85vh;overflow-y:auto;">
-          <div id="data-history-title" style="font-size:16px;font-weight:700;color:#1d1d1f;margin-bottom:16px;"></div>
-          <div id="data-history-body"></div>
-          <div style="display:flex;justify-content:flex-end;margin-top:16px;">
-            <button class="btn btn-o btn-sm" onclick="dataCloseHistory()">닫기</button>
-          </div>
-        </div>
+  <!-- 모듈 전환과 무관하게 항상 보여야 하므로 module-panel 밖(screen-app 바로 아래)에 배치 -->
+  <div id="data-modal-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:9999;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:18px;padding:24px;max-width:480px;width:90%;max-height:85vh;overflow-y:auto;">
+      <div id="data-modal-title" style="font-size:16px;font-weight:700;color:#1d1d1f;margin-bottom:16px;"></div>
+      <input type="hidden" id="data-modal-building-id">
+      <div id="data-modal-fields"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0;">
+        <select id="data-modal-source" style="padding:8px;border-radius:8px;border:1px solid #e0e0e0;">
+          <option value="현장조사">현장조사</option>
+          <option value="기초자료">기초자료</option>
+          <option value="교육청회신">교육청회신</option>
+        </select>
+        <input id="data-modal-note" placeholder="근거/메모" style="padding:8px;border-radius:8px;border:1px solid #e0e0e0;">
       </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="btn btn-o btn-sm" onclick="dataCloseModal()">취소</button>
+        <button class="btn btn-p btn-sm" onclick="dataSubmitModal()">저장</button>
+      </div>
+    </div>
+  </div>
 
+  <div id="data-history-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:9999;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:18px;padding:24px;max-width:520px;width:90%;max-height:85vh;overflow-y:auto;">
+      <div id="data-history-title" style="font-size:16px;font-weight:700;color:#1d1d1f;margin-bottom:16px;"></div>
+      <div id="data-history-body"></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:16px;">
+        <button class="btn btn-o btn-sm" onclick="dataCloseHistory()">닫기</button>
+      </div>
     </div>
   </div>
 
@@ -2927,10 +2929,52 @@ const saveCfg = o => localStorage.setItem('bzCfg', JSON.stringify({...cfg(),...o
 // 체크리스트 데이터는 프로젝트별로 분리 저장
 const clKey = () => `bzCL_${currentProject?.id||'default'}`;
 const getCL = () => JSON.parse(localStorage.getItem(clKey())||'{}');
+let _clPendingSync = {};
+let _clSyncTimer = null;
 const setCLv = (sid,key,val) => {
   const d=getCL(); if(!d[sid]) d[sid]={};
   d[sid][key]=val; localStorage.setItem(clKey(),JSON.stringify(d));
+  if (!_clPendingSync[sid]) _clPendingSync[sid] = {};
+  _clPendingSync[sid][key] = val;
+  clearTimeout(_clSyncTimer);
+  _clSyncTimer = setTimeout(flushCLSync, 800);
 };
+
+async function flushCLSync(){
+  if (!currentProject) return;
+  var items = [];
+  Object.keys(_clPendingSync).forEach(function(sid){
+    Object.keys(_clPendingSync[sid]).forEach(function(key){
+      items.push({ legacy_id: Number(sid), item_key: key, value: _clPendingSync[sid][key] });
+    });
+  });
+  _clPendingSync = {};
+  if (!items.length) return;
+  try{
+    await authFetch('/api/checklist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'bulk_set', project_id: currentProject.id, items: items })
+    });
+  }catch(e){}
+}
+
+async function clHydrateFromServer(){
+  if (!currentProject) return;
+  try{
+    var r = await authFetch('/api/checklist?project_id=' + encodeURIComponent(currentProject.id));
+    if (!r.ok) return;
+    var d = await r.json();
+    var rows = d.items || [];
+    if (!rows.length) return;
+    var cache = getCL();
+    rows.forEach(function(row){
+      if (!cache[row.legacy_id]) cache[row.legacy_id] = {};
+      cache[row.legacy_id][row.item_key] = row.value;
+    });
+    localStorage.setItem(clKey(), JSON.stringify(cache));
+  }catch(e){}
+}
 const getSchoolCodes = () => currentProject?.codes || cfg().schoolCodes || DEFAULT_CODES;
 
 // ════════════════════════════════════
@@ -3260,6 +3304,7 @@ async function loadProject(id){
   currentProject=await r.json();
   SCHOOLS=currentProject.schools.slice().sort((a,b)=>a.disp-b.disp);
   DEFAULT_CODES=currentProject.codes||{};
+  await clHydrateFromServer();
 }
 
 // 관리자 설정 탭 내부에서 프로젝트 목록 갱신용
@@ -3541,20 +3586,30 @@ async function suDeleteUser(uid,email){
     else alert('삭제 실패: '+d.error);
   }catch(e){ alert(e.message); }
 }
+async function suSetPermission(uid, checked){
+  try{
+    var res=await authFetch('/api/admin-users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set_permission',userId:uid,can_edit_basic_data:checked})});
+    var d=await res.json();
+    if(!d.success) alert('권한 변경 실패: '+d.error);
+  }catch(e){ alert(e.message); }
+}
 async function suLoadUsers(){
   var tbody=document.getElementById('su-tbody');
-  tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--gray)">로딩 중...</td></tr>';
+  tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--gray)">로딩 중...</td></tr>';
   try{
     var res=await authFetch('/api/admin-users');
     var d=await res.json();
-    if(!d.users||d.users.length===0){ tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--gray)">등록된 계정 없음</td></tr>'; return; }
+    if(!d.users||d.users.length===0){ tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--gray)">등록된 계정 없음</td></tr>'; return; }
     tbody.innerHTML=d.users.map(function(u){
       var roleLabel=u.role==='admin'?'관리자':u.role==='agency'?'발주청':'학교';
       var extra=u.role==='agency'?(u.region||'-'):u.role==='school'?('ID:'+u.school_id):'-';
       var dt=u.created_at?u.created_at.substring(0,10):'';
-      return '<tr><td>'+u.email+'</td><td>'+roleLabel+'</td><td>'+u.display_name+'</td><td>'+extra+'</td><td>'+dt+'</td><td><button class="btn btn-o" style="font-size:10px;padding:2px 8px" onclick="suDeleteUser(\''+u.id+'\',\''+u.email+'\')">삭제</button></td></tr>';
+      var permCell = u.role==='admin'
+        ? '<label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" '+(u.can_edit_basic_data?'checked':'')+' onchange="suSetPermission(\''+u.id+'\',this.checked)">값 입력 가능</label>'
+        : '<span style="color:var(--gray)">-</span>';
+      return '<tr><td>'+u.email+'</td><td>'+roleLabel+'</td><td>'+u.display_name+'</td><td>'+extra+'</td><td>'+dt+'</td><td>'+permCell+'</td><td><button class="btn btn-o" style="font-size:10px;padding:2px 8px" onclick="suDeleteUser(\''+u.id+'\',\''+u.email+'\')">삭제</button></td></tr>';
     }).join('');
-  }catch(e){ tbody.innerHTML='<tr><td colspan="6" style="color:red">'+e.message+'</td></tr>'; }
+  }catch(e){ tbody.innerHTML='<tr><td colspan="7" style="color:red">'+e.message+'</td></tr>'; }
 }
 
 // ════════════════════════════════════
@@ -4291,6 +4346,34 @@ function buildStatusScreen(){
 
   document.getElementById('ov-wrap').innerHTML=
     `<table class="ovt"><thead>${hdr1}${hdr2}</thead><tbody>${tbody}</tbody></table>`;
+
+  renderStage2Panel();
+}
+
+async function renderStage2Panel(){
+  var panel = document.getElementById('stage2-panel');
+  if (!panel) return;
+  if (!(_supabaseProfile && _supabaseProfile.can_edit_basic_data)) { panel.innerHTML = ''; return; }
+
+  panel.innerHTML = '<div style="text-align:center;color:#7a7a7a;padding:12px;font-size:13px;">기초자료 2단계 불러오는 중...</div>';
+  if (!_dataFields.length) {
+    await dataSync();
+    await dataLoadBuildings();
+  }
+
+  var my = SCHOOLS.filter(function(s){ return visIds.includes(s.id); });
+  var rows = my.map(function(s){
+    var b = _dataBuildings.find(function(x){ return x.legacy_id === s.id; });
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-bottom:1px solid #f0f0f0;font-size:13px;">'
+      + '<span>' + (s.school||'') + ' ' + (s.building||'') + '</span>'
+      + (b ? '<button class="btn btn-o btn-sm" onclick="dataOpenModal(\'' + b.id + '\')">값 입력</button>' : '<span style="color:#aaa;font-size:12px;">동기화 필요</span>')
+      + '</div>';
+  }).join('');
+
+  panel.innerHTML = '<div style="background:#fff;border-radius:14px;border:1px solid #e0e0e0;padding:12px 4px;margin-bottom:16px;">'
+    + '<div style="font-weight:700;font-size:14px;padding:4px 10px 8px;">기초자료 2단계 · 실제 값 입력</div>'
+    + rows
+    + '</div>';
 }
 
 // ════════════════════════════════════
