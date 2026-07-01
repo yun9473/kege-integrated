@@ -17,6 +17,36 @@ export default async function handler(req, res) {
   if (profile.role !== 'admin') return res.status(403).json({ error: '권한 없음', reason: 'not_admin', role: profile.role });
 
   if (req.method === 'GET') {
+    const historyOf = req.query.history;
+
+    if (historyOf) {
+      const { data: logs, error: logErr } = await sb
+        .from('building_change_log')
+        .select('id, field_name, old_value, new_value, source, note, confirmed_by, confirmed_at')
+        .eq('building_id', historyOf)
+        .order('confirmed_at', { ascending: false });
+      if (logErr) return res.status(500).json({ error: logErr.message });
+
+      const { data: fieldDefs } = await sb.from('building_field_master').select('field_key, field_label');
+      const fieldLabelMap = {};
+      (fieldDefs || []).forEach(function (f) { fieldLabelMap[f.field_key] = f.field_label; });
+
+      const editorIds = Array.from(new Set((logs || []).map(function (l) { return l.confirmed_by; }).filter(Boolean)));
+      let editorMap = {};
+      if (editorIds.length) {
+        const { data: editors } = await sb.from('profiles').select('id, display_name').in('id', editorIds);
+        (editors || []).forEach(function (p) { editorMap[p.id] = p.display_name; });
+      }
+
+      const result = (logs || []).map(function (l) {
+        return Object.assign({}, l, {
+          field_label: fieldLabelMap[l.field_name] || l.field_name,
+          editor_name: editorMap[l.confirmed_by] || '(알 수 없음)'
+        });
+      });
+      return res.json({ history: result });
+    }
+
     const projectId = req.query.project_id;
     if (!projectId) return res.status(400).json({ error: 'project_id 필요' });
 
@@ -33,16 +63,27 @@ export default async function handler(req, res) {
     let values = [];
     if (buildingIds.length) {
       const { data: v, error: vErr } = await sb
-        .from('building_values').select('building_id, field_key, value, updated_at')
+        .from('building_values').select('building_id, field_key, value, updated_at, updated_by')
         .in('building_id', buildingIds);
       if (vErr) return res.status(500).json({ error: vErr.message });
       values = v || [];
     }
 
+    const editorIds = Array.from(new Set(values.map(function (v) { return v.updated_by; }).filter(Boolean)));
+    let editorMap = {};
+    if (editorIds.length) {
+      const { data: editors } = await sb.from('profiles').select('id, display_name').in('id', editorIds);
+      (editors || []).forEach(function (p) { editorMap[p.id] = p.display_name; });
+    }
+
     const valuesByBuilding = {};
     values.forEach(function (v) {
       if (!valuesByBuilding[v.building_id]) valuesByBuilding[v.building_id] = {};
-      valuesByBuilding[v.building_id][v.field_key] = { value: v.value, updated_at: v.updated_at };
+      valuesByBuilding[v.building_id][v.field_key] = {
+        value: v.value,
+        updated_at: v.updated_at,
+        updated_by_name: editorMap[v.updated_by] || null
+      };
     });
 
     const result = (buildings || []).map(function (b) {

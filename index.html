@@ -2690,6 +2690,16 @@ table.dtable tbody tr{cursor:pointer;}
         </div>
       </div>
 
+      <div id="data-history-bg" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:9999;align-items:center;justify-content:center;">
+        <div style="background:#fff;border-radius:18px;padding:24px;max-width:520px;width:90%;max-height:85vh;overflow-y:auto;">
+          <div id="data-history-title" style="font-size:16px;font-weight:700;color:#1d1d1f;margin-bottom:16px;"></div>
+          <div id="data-history-body"></div>
+          <div style="display:flex;justify-content:flex-end;margin-top:16px;">
+            <button class="btn btn-o btn-sm" onclick="dataCloseHistory()">닫기</button>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -7518,13 +7528,13 @@ function dataFieldDisplay(field, raw){
   return raw;
 }
 
-function dataLastUpdated(b){
+function dataLastEdit(b){
   var latest = null;
   Object.keys(b.values).forEach(function(k){
     var v = b.values[k];
     if (v && v.updated_at) {
       var t = new Date(v.updated_at);
-      if (!latest || t > latest) latest = t;
+      if (!latest || t > latest.time) latest = { time: t, name: v.updated_by_name };
     }
   });
   return latest;
@@ -7538,7 +7548,7 @@ function dataFormatDateTime(d){
 function dataRenderTable(){
   var head = '<th style="padding:8px 6px">학교</th><th style="padding:8px 6px">동</th>';
   _dataFields.forEach(function(f){ head += '<th style="padding:8px 6px">' + f.field_label + '</th>'; });
-  head += '<th style="padding:8px 6px">최근수정</th><th style="padding:8px 6px"></th>';
+  head += '<th style="padding:8px 6px">최근수정</th><th style="padding:8px 6px">수정자</th><th style="padding:8px 6px"></th>';
 
   var rows = _dataBuildings.map(function(b){
     var cells = '<td style="padding:8px 6px">' + (b.school_name || '-') + '</td>'
@@ -7547,8 +7557,13 @@ function dataRenderTable(){
       var v = b.values[f.field_key];
       cells += '<td style="padding:8px 6px">' + dataFieldDisplay(f, v ? v.value : null) + '</td>';
     });
-    cells += '<td style="padding:8px 6px;color:#7a7a7a;font-size:11px;white-space:nowrap;">' + dataFormatDateTime(dataLastUpdated(b)) + '</td>';
-    cells += '<td style="padding:8px 6px"><button class="btn btn-o btn-sm" onclick="dataOpenModal(\'' + b.id + '\')">기록</button></td>';
+    var lastEdit = dataLastEdit(b);
+    cells += '<td style="padding:8px 6px;color:#7a7a7a;font-size:11px;white-space:nowrap;">' + dataFormatDateTime(lastEdit ? lastEdit.time : null) + '</td>';
+    cells += '<td style="padding:8px 6px;color:#7a7a7a;font-size:11px;white-space:nowrap;">' + (lastEdit && lastEdit.name ? lastEdit.name : '-') + '</td>';
+    cells += '<td style="padding:8px 6px;white-space:nowrap;">'
+      + '<button class="btn btn-o btn-sm" onclick="dataOpenModal(\'' + b.id + '\')">기록</button> '
+      + '<button class="btn btn-o btn-sm" onclick="dataOpenHistory(\'' + b.id + '\')">이력</button>'
+      + '</td>';
     return '<tr style="border-bottom:1px solid #f0f0f0">' + cells + '</tr>';
   }).join('');
 
@@ -7556,6 +7571,34 @@ function dataRenderTable(){
     '<table style="width:100%;border-collapse:collapse;font-size:13px">'
     + '<tr style="border-bottom:1px solid #e0e0e0;color:#7a7a7a;text-align:left">' + head + '</tr>'
     + rows + '</table>';
+}
+
+async function dataOpenHistory(buildingId){
+  var b = _dataBuildings.find(function(x){ return x.id === buildingId; });
+  if (!b) return;
+  document.getElementById('data-history-title').textContent = (b.school_name || '') + ' ' + (b.building_name || '') + ' 변경이력';
+  document.getElementById('data-history-body').innerHTML = '<div style="text-align:center;color:#7a7a7a;padding:16px;font-size:13px;">불러오는 중...</div>';
+  document.getElementById('data-history-bg').style.display = 'flex';
+
+  var r = await authFetch('/api/buildings?history=' + encodeURIComponent(buildingId));
+  var d = await r.json();
+  var logs = d.history || [];
+  if (!logs.length) {
+    document.getElementById('data-history-body').innerHTML = '<div style="text-align:center;color:#aaa;padding:16px;font-size:13px;">변경 기록이 없습니다</div>';
+    return;
+  }
+  document.getElementById('data-history-body').innerHTML = logs.map(function(l){
+    return '<div style="border-bottom:1px solid #f0f0f0;padding:10px 0;font-size:13px;">'
+      + '<div style="display:flex;justify-content:space-between;color:#7a7a7a;font-size:11px;margin-bottom:4px;">'
+      + '<span>' + dataFormatDateTime(new Date(l.confirmed_at)) + '</span><span>' + l.editor_name + '</span></div>'
+      + '<div><b>' + l.field_label + '</b>: ' + (l.old_value != null ? l.old_value : '(없음)') + ' → ' + l.new_value + '</div>'
+      + (l.source || l.note ? '<div style="color:#7a7a7a;font-size:11px;margin-top:2px;">' + [l.source, l.note].filter(Boolean).join(' · ') + '</div>' : '')
+      + '</div>';
+  }).join('');
+}
+
+function dataCloseHistory(){
+  document.getElementById('data-history-bg').style.display = 'none';
 }
 
 function dataOpenModal(buildingId){
@@ -7668,7 +7711,9 @@ function dataExportExcel(){
       var v = b.values[f.field_key];
       row[f.field_label] = dataFieldDisplay(f, v ? v.value : null);
     });
-    row['최근수정'] = dataFormatDateTime(dataLastUpdated(b));
+    var lastEdit = dataLastEdit(b);
+    row['최근수정'] = dataFormatDateTime(lastEdit ? lastEdit.time : null);
+    row['수정자'] = lastEdit && lastEdit.name ? lastEdit.name : '';
     return row;
   });
   var ws = XLSX.utils.json_to_sheet(rows);
