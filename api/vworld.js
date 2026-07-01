@@ -13,7 +13,12 @@ export default async function handler(req, res) {
     `&bbox=${bbox},EPSG:4326&key=${key}`;
 
   try {
-    const r = await fetch(url);
+    const r = await fetch(url, {
+      headers: {
+        'Referer': 'https://kege-integrated.vercel.app',
+        'Origin': 'https://kege-integrated.vercel.app'
+      }
+    });
     if (!r.ok) {
       const body = await r.text().catch(() => '');
       return res.status(502).json({ error: 'vworld error', status: r.status, body, url: url.replace(key, 'HIDDEN') });
