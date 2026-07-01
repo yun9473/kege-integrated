@@ -2576,6 +2576,7 @@ table.dtable tbody tr{cursor:pointer;}
       <div class="research-tabs">
         <button class="research-tab active" onclick="hwpxSwitchSubTab('report')">보고서 작성</button>
         <button class="research-tab" onclick="hwpxSwitchSubTab('dxf')">증축이력 조사</button>
+        <button class="research-tab" onclick="hwpxSwitchSubTab('data')">데이터 정합화</button>
       </div>
 
       <!-- Sub-tab 1: 보고서 작성 (HWPX) -->
@@ -2635,6 +2636,46 @@ table.dtable tbody tr{cursor:pointer;}
               <div class="step-num">3</div>
               <div><div style="font-size:14px;font-weight:600;color:#1d1d1f;">DXF 파일 선택 → PPT 자동 생성</div><div style="font-size:13px;color:#7a7a7a;margin-top:2px;">증축이력 도면(DXF)을 선택하면 PPT가 자동으로 만들어집니다</div></div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sub-tab 3: 데이터 정합화 -->
+      <div id="research-sub-data" class="research-subtab">
+        <div style="text-align:center;margin-bottom:24px;">
+          <div style="font-size:17px;color:#7a7a7a;line-height:1.47;">대상동 기초자료를 한 곳에서 관리하고 변경이력을 기록합니다.</div>
+        </div>
+        <div style="max-width:900px;margin:0 auto 16px;display:flex;gap:8px;justify-content:flex-end;">
+          <button class="btn btn-o btn-sm" onclick="dataSync().then(dataLoadBuildings)">명단 동기화</button>
+          <button class="btn btn-o btn-sm" onclick="dataExportExcel()">Excel 다운로드</button>
+        </div>
+        <div style="max-width:900px;margin:0 auto;background:#fff;border-radius:18px;border:1px solid #e0e0e0;padding:16px;overflow-x:auto;">
+          <div id="data-table-wrap"><div style="text-align:center;color:#7a7a7a;padding:24px;font-size:13px;">불러오는 중...</div></div>
+        </div>
+        <div id="data-form" style="display:none;max-width:900px;margin:16px auto 0;background:#fff;border-radius:18px;border:1px solid #e0e0e0;padding:20px;">
+          <div style="font-size:15px;font-weight:700;color:#1d1d1f;margin-bottom:12px;">변경사항 기록</div>
+          <input type="hidden" id="data-form-building-id">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+            <select id="data-form-field" style="padding:8px;border-radius:8px;border:1px solid #e0e0e0;">
+              <option value="gross_area">연면적</option>
+              <option value="built_year">준공연도</option>
+              <option value="seismic_capacity">내진성능유무 (true/false)</option>
+              <option value="seismic_reinforced">내진보강여부 (true/false)</option>
+              <option value="asbestos">석면유무 (true/false)</option>
+              <option value="safety_grade">안전등급</option>
+              <option value="evaluation_type">개축/리모델링 (개축 또는 리모델링)</option>
+            </select>
+            <input id="data-form-value" placeholder="변경값" style="padding:8px;border-radius:8px;border:1px solid #e0e0e0;">
+            <select id="data-form-source" style="padding:8px;border-radius:8px;border:1px solid #e0e0e0;">
+              <option value="현장조사">현장조사</option>
+              <option value="기초자료">기초자료</option>
+              <option value="교육청회신">교육청회신</option>
+            </select>
+            <input id="data-form-note" placeholder="근거/메모" style="padding:8px;border-radius:8px;border:1px solid #e0e0e0;">
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button class="btn btn-o btn-sm" onclick="document.getElementById('data-form').style.display='none'">취소</button>
+            <button class="btn btn-p btn-sm" onclick="dataSubmitChange()">저장</button>
           </div>
         </div>
       </div>
@@ -7422,13 +7463,107 @@ var hwpxExcelWb = null;
 function hwpxSwitchSubTab(tab) {
   document.querySelectorAll('.research-tab').forEach(function(b){ b.classList.remove('active'); });
   document.querySelectorAll('.research-subtab').forEach(function(p){ p.classList.remove('active'); });
-  if (tab === 'report') {
-    document.querySelector('.research-tab:first-child').classList.add('active');
-    document.getElementById('research-sub-report').classList.add('active');
-  } else {
-    document.querySelector('.research-tab:last-child').classList.add('active');
-    document.getElementById('research-sub-dxf').classList.add('active');
-  }
+  var TABS = { report: 0, dxf: 1, data: 2 };
+  var idx = TABS[tab] !== undefined ? TABS[tab] : 0;
+  var btns = document.querySelectorAll('.research-tab');
+  if (btns[idx]) btns[idx].classList.add('active');
+  var panelId = tab === 'report' ? 'research-sub-report' : tab === 'dxf' ? 'research-sub-dxf' : 'research-sub-data';
+  document.getElementById(panelId).classList.add('active');
+  if (tab === 'data') dataInit();
+}
+
+// ═══════════════════════════════════════
+// 데이터 정합화 (buildings 마스터)
+// ═══════════════════════════════════════
+let _dataBuildings = [];
+
+async function dataInit(){
+  if (role !== 'admin' || !currentProject) return;
+  await dataSync();
+  await dataLoadBuildings();
+}
+
+async function dataSync(){
+  if (!currentProject) return;
+  await authFetch('/api/buildings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'sync', project_id: currentProject.id, schools: SCHOOLS })
+  });
+}
+
+async function dataLoadBuildings(){
+  if (!currentProject) return;
+  var r = await authFetch('/api/buildings?project_id=' + encodeURIComponent(currentProject.id));
+  var d = await r.json();
+  _dataBuildings = d.buildings || [];
+  dataRenderTable();
+}
+
+function dataRenderTable(){
+  var html = '<table style="width:100%;border-collapse:collapse;font-size:13px">';
+  html += '<tr style="border-bottom:1px solid #e0e0e0;color:#7a7a7a;text-align:left">'
+    + '<th style="padding:8px 6px">학교</th><th style="padding:8px 6px">동</th>'
+    + '<th style="padding:8px 6px">연면적</th><th style="padding:8px 6px">준공연도</th>'
+    + '<th style="padding:8px 6px">내진보강</th><th style="padding:8px 6px">석면</th>'
+    + '<th style="padding:8px 6px">안전등급</th><th style="padding:8px 6px">최근수정</th>'
+    + '<th style="padding:8px 6px"></th></tr>';
+  _dataBuildings.forEach(function(b){
+    html += '<tr style="border-bottom:1px solid #f0f0f0">'
+      + '<td style="padding:8px 6px">' + (b.school_name || '-') + '</td>'
+      + '<td style="padding:8px 6px">' + (b.building_name || '-') + '</td>'
+      + '<td style="padding:8px 6px">' + (b.gross_area != null ? b.gross_area : '-') + '</td>'
+      + '<td style="padding:8px 6px">' + (b.built_year != null ? b.built_year : '-') + '</td>'
+      + '<td style="padding:8px 6px">' + (b.seismic_reinforced === true ? '완료' : b.seismic_reinforced === false ? '미실시' : '-') + '</td>'
+      + '<td style="padding:8px 6px">' + (b.asbestos === true ? '있음' : b.asbestos === false ? '없음' : '-') + '</td>'
+      + '<td style="padding:8px 6px">' + (b.safety_grade || '-') + '</td>'
+      + '<td style="padding:8px 6px;color:#7a7a7a;font-size:11px">' + (b.updated_at ? new Date(b.updated_at).toLocaleDateString() : '-') + '</td>'
+      + '<td style="padding:8px 6px"><button class="btn btn-o btn-sm" onclick="dataOpenChangeForm(\'' + b.id + '\')">기록</button></td>'
+      + '</tr>';
+  });
+  html += '</table>';
+  document.getElementById('data-table-wrap').innerHTML = html;
+}
+
+function dataOpenChangeForm(buildingId){
+  document.getElementById('data-form-building-id').value = buildingId;
+  document.getElementById('data-form').style.display = 'block';
+  document.getElementById('data-form').scrollIntoView({ behavior: 'smooth' });
+}
+
+async function dataSubmitChange(){
+  var buildingId = document.getElementById('data-form-building-id').value;
+  var fieldName = document.getElementById('data-form-field').value;
+  var newValue = document.getElementById('data-form-value').value.trim();
+  var source = document.getElementById('data-form-source').value;
+  var note = document.getElementById('data-form-note').value.trim();
+  if (!newValue) { alert('변경값을 입력하세요'); return; }
+  var r = await authFetch('/api/buildings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'log_change', building_id: buildingId, field_name: fieldName, new_value: newValue, source: source, note: note })
+  });
+  if (!r.ok) { alert('저장 실패'); return; }
+  document.getElementById('data-form-value').value = '';
+  document.getElementById('data-form-note').value = '';
+  document.getElementById('data-form').style.display = 'none';
+  await dataLoadBuildings();
+}
+
+function dataExportExcel(){
+  var rows = _dataBuildings.map(function(b){
+    return {
+      학교명: b.school_name, 건물동명: b.building_name, 연면적: b.gross_area, 준공연도: b.built_year,
+      내진보강여부: b.seismic_reinforced === true ? '완료' : b.seismic_reinforced === false ? '미실시' : '',
+      석면유무: b.asbestos === true ? '있음' : b.asbestos === false ? '없음' : '',
+      안전등급: b.safety_grade, 개축리모델링: b.evaluation_type,
+      최근수정: b.updated_at ? new Date(b.updated_at).toLocaleString() : ''
+    };
+  });
+  var ws = XLSX.utils.json_to_sheet(rows);
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '대상동현황');
+  XLSX.writeFile(wb, '대상동현황_' + (currentProject ? currentProject.id : 'export') + '.xlsx');
 }
 
 function hwpxHandleTemplate(file) {
