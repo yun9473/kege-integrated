@@ -1,10 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
 
-const ALLOWED_FIELDS = [
-  'school_name', 'building_name', 'gross_area', 'built_year',
-  'seismic_capacity', 'seismic_reinforced', 'asbestos', 'safety_grade', 'evaluation_type'
-];
-
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -24,9 +19,37 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     const projectId = req.query.project_id;
     if (!projectId) return res.status(400).json({ error: 'project_id 필요' });
-    const { data, error } = await sb.from('buildings').select('*').eq('project_id', projectId).order('legacy_id');
-    if (error) return res.status(500).json({ error: error.message });
-    return res.json({ buildings: data });
+
+    const { data: fields, error: fieldsErr } = await sb
+      .from('building_field_master').select('*').eq('active', true).order('display_order');
+    if (fieldsErr) return res.status(500).json({ error: fieldsErr.message });
+
+    const { data: buildings, error: bErr } = await sb
+      .from('buildings').select('id, legacy_id, school_name, building_name, region, area, school_type')
+      .eq('project_id', projectId).order('legacy_id');
+    if (bErr) return res.status(500).json({ error: bErr.message });
+
+    const buildingIds = (buildings || []).map(function (b) { return b.id; });
+    let values = [];
+    if (buildingIds.length) {
+      const { data: v, error: vErr } = await sb
+        .from('building_values').select('building_id, field_key, value, updated_at')
+        .in('building_id', buildingIds);
+      if (vErr) return res.status(500).json({ error: vErr.message });
+      values = v || [];
+    }
+
+    const valuesByBuilding = {};
+    values.forEach(function (v) {
+      if (!valuesByBuilding[v.building_id]) valuesByBuilding[v.building_id] = {};
+      valuesByBuilding[v.building_id][v.field_key] = { value: v.value, updated_at: v.updated_at };
+    });
+
+    const result = (buildings || []).map(function (b) {
+      return Object.assign({}, b, { values: valuesByBuilding[b.id] || {} });
+    });
+
+    return res.json({ buildings: result, fields: fields || [] });
   }
 
   if (req.method === 'POST') {
@@ -58,24 +81,57 @@ export default async function handler(req, res) {
       return res.json({ inserted: toInsert.length });
     }
 
-    if (action === 'log_change') {
-      const { building_id, field_name, new_value, evidence_url, source, note } = req.body;
-      if (!building_id || !ALLOWED_FIELDS.includes(field_name)) {
+    if (action === 'log_changes') {
+      const { building_id, changes, source, note } = req.body;
+      if (!building_id || !Array.isArray(changes) || !changes.length) {
         return res.status(400).json({ error: '잘못된 요청' });
       }
-      const { data: building } = await sb.from('buildings').select(field_name).eq('id', building_id).single();
-      if (!building) return res.status(404).json({ error: '대상동 없음' });
-      const oldValue = building[field_name];
-      const { error } = await sb.from('building_change_log').insert({
-        building_id: building_id,
-        field_name: field_name,
-        old_value: oldValue === null || oldValue === undefined ? null : String(oldValue),
-        new_value: String(new_value),
-        evidence_url: evidence_url || null,
-        source: source || null,
-        note: note || null,
-        confirmed_by: profile.id
+      const { data: activeFields } = await sb.from('building_field_master').select('field_key').eq('active', true);
+      const activeKeys = new Set((activeFields || []).map(function (f) { return f.field_key; }));
+      const { data: currentValues } = await sb.from('building_values').select('field_key, value').eq('building_id', building_id);
+      const currentByKey = {};
+      (currentValues || []).forEach(function (v) { currentByKey[v.field_key] = v.value; });
+
+      const rows = [];
+      for (const c of changes) {
+        if (!activeKeys.has(c.field_name)) continue;
+        rows.push({
+          building_id: building_id,
+          field_name: c.field_name,
+          old_value: currentByKey[c.field_name] != null ? currentByKey[c.field_name] : null,
+          new_value: String(c.new_value),
+          source: source || null,
+          note: note || null,
+          confirmed_by: profile.id
+        });
+      }
+      if (!rows.length) return res.status(400).json({ error: '유효한 변경 항목 없음' });
+      const { error } = await sb.from('building_change_log').insert(rows);
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json({ success: true, count: rows.length });
+    }
+
+    if (action === 'field_add') {
+      const { field_key, field_label, data_type, select_options } = req.body;
+      if (!field_key || !field_label || !['text', 'number', 'boolean', 'select'].includes(data_type)) {
+        return res.status(400).json({ error: '잘못된 요청' });
+      }
+      const { data: maxOrder } = await sb.from('building_field_master').select('display_order').order('display_order', { ascending: false }).limit(1).single();
+      const { error } = await sb.from('building_field_master').insert({
+        field_key: field_key,
+        field_label: field_label,
+        data_type: data_type,
+        select_options: data_type === 'select' && Array.isArray(select_options) ? select_options : null,
+        display_order: (maxOrder ? maxOrder.display_order : 0) + 1
       });
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json({ success: true });
+    }
+
+    if (action === 'field_remove') {
+      const { field_key } = req.body;
+      if (!field_key) return res.status(400).json({ error: 'field_key 필요' });
+      const { error } = await sb.from('building_field_master').update({ active: false }).eq('field_key', field_key);
       if (error) return res.status(500).json({ error: error.message });
       return res.json({ success: true });
     }
