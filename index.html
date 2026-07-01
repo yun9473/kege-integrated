@@ -7689,14 +7689,36 @@ function dataCloseHistory(){
   document.getElementById('data-history-bg').style.display = 'none';
 }
 
+// 1단계(기초자료 업로드) 자동추출 값 중 검증 가능한 것만 2단계 항목에 추천값으로 연결
+var DATA_CHECKLIST_BRIDGE = { gross_area: ['building_area', 'public_area'] };
+
+function dataSuggestFromChecklist(fieldKey, legacyId){
+  var sources = DATA_CHECKLIST_BRIDGE[fieldKey];
+  if (!sources || legacyId == null) return null;
+  var d = getCL()[legacyId] || {};
+  for (var i = 0; i < sources.length; i++){
+    var raw = d[sources[i]];
+    if (!raw) continue;
+    var num = Number(String(raw).replace(/,/g, ''));
+    if (isFinite(num) && num > 0 && num < 500000) return String(num);
+  }
+  return null;
+}
+
 function dataOpenModal(buildingId){
   var b = _dataBuildings.find(function(x){ return x.id === buildingId; });
   if (!b) return;
   document.getElementById('data-modal-title').textContent = (b.school_name || '') + ' ' + (b.building_name || '');
   document.getElementById('data-modal-building-id').value = buildingId;
 
+  var anySuggested = false;
   var body = _dataFields.map(function(f){
     var cur = b.values[f.field_key] ? b.values[f.field_key].value : '';
+    var suggested = false;
+    if (cur === '' && f.data_type === 'number') {
+      var s = dataSuggestFromChecklist(f.field_key, b.legacy_id);
+      if (s) { cur = s; suggested = true; anySuggested = true; }
+    }
     var input;
     if (f.data_type === 'boolean') {
       input = '<select data-field="' + f.field_key + '" style="width:100%;padding:8px;border-radius:8px;border:1px solid #e0e0e0;box-sizing:border-box;">'
@@ -7711,12 +7733,14 @@ function dataOpenModal(buildingId){
       input = '<select data-field="' + f.field_key + '" style="width:100%;padding:8px;border-radius:8px;border:1px solid #e0e0e0;box-sizing:border-box;">'
         + '<option value="">미확인</option>' + opts + '</select>';
     } else {
-      input = '<input data-field="' + f.field_key + '" type="' + (f.data_type === 'number' ? 'number' : 'text') + '" value="' + (cur || '') + '" style="width:100%;padding:8px;border-radius:8px;border:1px solid #e0e0e0;box-sizing:border-box;">';
+      input = '<input data-field="' + f.field_key + '" type="' + (f.data_type === 'number' ? 'number' : 'text') + '" value="' + (cur || '') + '" style="width:100%;padding:8px;border-radius:8px;border:1px solid #e0e0e0;box-sizing:border-box;' + (suggested ? 'border-color:#0066cc;' : '') + '">';
     }
-    return '<div style="margin-bottom:12px;"><div style="font-size:12px;color:#7a7a7a;margin-bottom:4px;">' + f.field_label + '</div>' + input + '</div>';
+    var hint = suggested ? '<div style="font-size:11px;color:#0066cc;margin-top:2px;">기초자료 1단계에서 자동추출된 값 — 확인 후 저장하세요</div>' : '';
+    return '<div style="margin-bottom:12px;"><div style="font-size:12px;color:#7a7a7a;margin-bottom:4px;">' + f.field_label + '</div>' + input + hint + '</div>';
   }).join('');
 
   document.getElementById('data-modal-fields').innerHTML = body;
+  if (anySuggested) document.getElementById('data-modal-source').value = '기초자료';
   document.getElementById('data-modal-bg').style.display = 'flex';
 }
 
