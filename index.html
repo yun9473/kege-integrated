@@ -8502,13 +8502,13 @@ function mapCreateMarker(d) {
         '</span></div>';
     });
     iwHtml += '</div>';
-    // 용도지역 섹션 — 비동기 조회 후 교체
-    iwHtml += '<div id="iw-zoning-' + d.school + '" style="margin-top:8px;padding-top:6px;border-top:1px solid #eee;font-size:11px;color:#888;">용도지역 조회 중...</div>';
-    iwHtml += '</div>';
-    _globalInfoWindow.setContent(iwHtml);
+    var zoningHtml = '<div style="margin-top:8px;padding-top:6px;border-top:1px solid #eee;font-size:11px;color:#888;">용도지역 조회 중...</div>';
+    _globalInfoWindow.setContent(iwHtml + zoningHtml + '</div>');
     _globalInfoWindow.open(_mapObj, marker);
-    // 용도지역 비동기 조회
-    mapFetchZoning(d.lat, d.lng, d.school);
+    // 용도지역 비동기 조회 — 완료 후 setContent로 전체 교체
+    mapFetchZoning(d.lat, d.lng, d.school, function(zoningSection) {
+      _globalInfoWindow.setContent(iwHtml + zoningSection + '</div>');
+    });
   });
   return marker;
 }
@@ -8539,9 +8539,9 @@ var _ZONING_RULES = {
 
 var _zoningCache = {};
 
-function mapFetchZoning(lat, lng, schoolKey) {
-  if (_zoningCache[schoolKey]) {
-    mapRenderZoning(schoolKey, _zoningCache[schoolKey]);
+function mapFetchZoning(lat, lng, schoolKey, cb) {
+  if (_zoningCache[schoolKey] !== undefined) {
+    cb(mapBuildZoningHtml(_zoningCache[schoolKey]));
     return;
   }
   fetch('/api/vworld?lat=' + lat + '&lng=' + lng)
@@ -8549,26 +8549,27 @@ function mapFetchZoning(lat, lng, schoolKey) {
     .then(function(d) {
       var result = d.found ? d.uqName : null;
       _zoningCache[schoolKey] = result;
-      mapRenderZoning(schoolKey, result);
+      cb(mapBuildZoningHtml(result));
     })
-    .catch(function() { mapRenderZoning(schoolKey, null); });
+    .catch(function() {
+      _zoningCache[schoolKey] = null;
+      cb(mapBuildZoningHtml(null));
+    });
 }
 
-function mapRenderZoning(schoolKey, uqName) {
-  var el = document.getElementById('iw-zoning-' + schoolKey);
-  if (!el) return;
+function mapBuildZoningHtml(uqName) {
   if (!uqName) {
-    el.innerHTML = '<span style="color:#aaa;">용도지역 정보 없음</span>';
-    return;
+    return '<div style="margin-top:8px;padding-top:6px;border-top:1px solid #eee;font-size:10px;color:#aaa;">용도지역 정보 없음</div>';
   }
   var rule = _ZONING_RULES[uqName];
   var ruleHtml = rule
-    ? '<span style="color:#555;">건폐율 <b>' + rule.bcr + '%</b> 이하 &nbsp;·&nbsp; 용적률 <b>' + rule.far + '%</b> 이하</span>'
-    : '<span style="color:#aaa;">법규 정보 없음</span>';
-  el.innerHTML =
+    ? '건폐율 <b>' + rule.bcr + '%</b> 이하 &nbsp;·&nbsp; 용적률 <b>' + rule.far + '%</b> 이하'
+    : '법규 정보 없음';
+  return '<div style="margin-top:8px;padding-top:6px;border-top:1px solid #eee;">' +
     '<div style="font-size:10px;font-weight:600;color:#3a7bd5;margin-bottom:2px;">' + uqName + '</div>' +
-    '<div style="font-size:10px;">' + ruleHtml + '</div>' +
-    '<div style="font-size:9px;color:#aaa;margin-top:2px;">국토계획법 시행령 기준 (법정 상한)</div>';
+    '<div style="font-size:10px;color:#444;">' + ruleHtml + '</div>' +
+    '<div style="font-size:9px;color:#aaa;margin-top:2px;">국토계획법 시행령 기준 (법정 상한)</div>' +
+    '</div>';
 }
 
 var _mapViewTimer = null;
