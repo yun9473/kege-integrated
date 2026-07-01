@@ -8367,29 +8367,33 @@ function mapParseSido(address) {
 }
 
 // ── IndexedDB 엑셀 영속화 ──
-function mapIDB(mode) {
-  return new Promise(function(resolve, reject) {
-    var req = indexedDB.open('kege_map', 1);
-    req.onupgradeneeded = function(e) { e.target.result.createObjectStore('files'); };
-    req.onsuccess = function(e) {
-      var db = e.target.result;
-      resolve(db.transaction('files', mode).objectStore('files'));
-    };
-    req.onerror = reject;
-  });
+function _mapOpenIDB(cb) {
+  var req = indexedDB.open('kege_map', 1);
+  req.onupgradeneeded = function(e) { e.target.result.createObjectStore('files'); };
+  req.onsuccess = function(e) { cb(e.target.result); };
+  req.onerror = function() { cb(null); };
 }
 function mapSaveExcelIDB(buf, name) {
-  mapIDB('readwrite').then(function(store) { store.put({ buf: buf, name: name, ts: Date.now() }, 'mapExcel'); }).catch(function(){});
+  _mapOpenIDB(function(db) {
+    if (!db) return;
+    try { db.transaction('files', 'readwrite').objectStore('files').put({ buf: buf, name: name, ts: Date.now() }, 'mapExcel'); } catch(e) {}
+  });
 }
 function mapLoadExcelIDB(cb) {
-  mapIDB('readonly').then(function(store) {
-    var req = store.get('mapExcel');
-    req.onsuccess = function(e) { cb(e.target.result || null); };
-    req.onerror = function() { cb(null); };
-  }).catch(function() { cb(null); });
+  _mapOpenIDB(function(db) {
+    if (!db) { cb(null); return; }
+    try {
+      var r = db.transaction('files', 'readonly').objectStore('files').get('mapExcel');
+      r.onsuccess = function(e) { cb(e.target.result || null); };
+      r.onerror = function() { cb(null); };
+    } catch(e) { cb(null); }
+  });
 }
 function mapClearExcelIDB() {
-  mapIDB('readwrite').then(function(store) { store.delete('mapExcel'); }).catch(function(){});
+  _mapOpenIDB(function(db) {
+    if (!db) return;
+    try { db.transaction('files', 'readwrite').objectStore('files').delete('mapExcel'); } catch(e) {}
+  });
 }
 
 function mapLoadExcel(input) {
