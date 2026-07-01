@@ -7576,7 +7576,7 @@ function hwpxSwitchSubTab(tab) {
   var panelId = tab === 'report' ? 'research-sub-report' : tab === 'dxf' ? 'research-sub-dxf' : 'research-sub-data';
   document.getElementById(panelId).classList.add('active');
   var wrap = document.getElementById('research-content-wrap');
-  if (wrap) wrap.style.maxWidth = tab === 'data' ? '1600px' : '800px';
+  if (wrap) wrap.style.maxWidth = tab === 'data' ? '96vw' : '800px';
   if (tab === 'data') dataInit();
 }
 
