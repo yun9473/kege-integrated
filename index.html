@@ -9309,7 +9309,7 @@ function mapOpenRoadview(lat, lng, schoolName) {
   var rvClient = new kakao.maps.RoadviewClient();
   var pos = new kakao.maps.LatLng(lat, lng);
 
-  rvClient.getNearestPanoId(pos, 100, function(panoId) {
+  rvClient.getNearestPanoId(pos, 200, function(panoId) {
     if (panoId === null) {
       container.style.display = 'none';
       msg.style.display = 'block';
