@@ -11,6 +11,7 @@ export default function handler(req, res) {
       neisKey: process.env.NEIS_KEY || '',
       supabaseUrl: process.env.SUPABASE_URL || '',
       supabaseAnonKey: process.env.SUPABASE_ANON_KEY || '',
+      vworldKey: process.env.VWORLD_API_KEY || '',
     });
   }
 

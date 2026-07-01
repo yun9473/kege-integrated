@@ -8538,23 +8538,38 @@ var _ZONING_RULES = {
 };
 
 var _zoningCache = {};
+var _vworldKey = null;
+
+function mapGetVworldKey() {
+  if (_vworldKey) return Promise.resolve(_vworldKey);
+  return fetch('/api/config').then(function(r) { return r.json(); }).then(function(cfg) {
+    _vworldKey = cfg.vworldKey || '';
+    return _vworldKey;
+  });
+}
 
 function mapFetchZoning(lat, lng, schoolKey, cb) {
   if (_zoningCache[schoolKey] !== undefined) {
     cb(mapBuildZoningHtml(_zoningCache[schoolKey]));
     return;
   }
-  fetch('/api/vworld?lat=' + lat + '&lng=' + lng)
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      var result = d.found ? d.uqName : null;
-      _zoningCache[schoolKey] = result;
-      cb(mapBuildZoningHtml(result));
-    })
-    .catch(function() {
-      _zoningCache[schoolKey] = null;
-      cb(mapBuildZoningHtml(null));
+  mapGetVworldKey().then(function(key) {
+    if (!key) { _zoningCache[schoolKey] = null; cb(mapBuildZoningHtml(null)); return; }
+    var delta = 0.0003;
+    var bbox = (parseFloat(lng)-delta) + ',' + (parseFloat(lat)-delta) + ',' + (parseFloat(lng)+delta) + ',' + (parseFloat(lat)+delta);
+    var url = 'https://api.vworld.kr/req/wfs?service=WFS&version=2.0.0&request=GetFeature' +
+      '&typeName=lt_c_uq111&output=application/json&srsName=EPSG:4326' +
+      '&bbox=' + bbox + ',EPSG:4326&key=' + key;
+    return fetch(url).then(function(r) { return r.json(); }).then(function(d) {
+      var features = d.features || [];
+      var uqName = features.length ? (features[0].properties.uq_nm || features[0].properties.UQ_NM || null) : null;
+      _zoningCache[schoolKey] = uqName;
+      cb(mapBuildZoningHtml(uqName));
     });
+  }).catch(function() {
+    _zoningCache[schoolKey] = null;
+    cb(mapBuildZoningHtml(null));
+  });
 }
 
 function mapBuildZoningHtml(uqName) {
