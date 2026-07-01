@@ -374,48 +374,102 @@ body{font-family:'Pretendard',system-ui,-apple-system,'Apple SD Gothic Neo',sans
 
 /* ═══ TABLET LAYOUT (769px ~ 1024px) ═══ */
 @media(min-width:769px) and (max-width:1024px){
-  /* ── 공통 버튼 터치 영역 ── */
+
+  /* ━━━ 공통 ━━━ */
+  /* 터치 버튼 영역 */
   .tbtn{padding:6px 14px;font-size:12px}
   .btn{padding:8px 16px;font-size:13px}
+  /* 상단 앱바 */
+  .topbar{padding:0 16px}
+  .topbar-title img{height:22px !important}
+  /* 탭 네비게이션 */
+  .integrated-nav{height:46px}
+  .integrated-nav .nav-item{padding:0 16px;font-size:13px;gap:5px}
+  /* 모달 */
+  .modal-box{max-width:680px !important}
+  .m-grid{grid-template-columns:1fr 1fr !important}
 
-  /* ── 지도: 상단 툴바 줄바꿈 허용 ── */
-  #module-map > div:first-child > div:first-child > div:last-child {
-    flex-wrap:wrap;gap:6px 10px
-  }
-  #mapSearchInput{width:160px !important}
+  /* ━━━ 로그인 ━━━ */
+  .lcard{max-width:480px}
 
-  /* ── 지도: 필터 패널 폭 축소 ── */
-  #mapFilterPanel{width:190px !important;padding:12px !important}
+  /* ━━━ 모듈/화면 선택 ━━━ */
+  /* 2열 그리드는 태블릿에서도 충분히 표시되므로 유지 */
+
+  /* ━━━ 공통 사이드바 + 메인 ━━━ */
+  .sidebar{width:190px}
+  .s-lbl{font-size:10px;padding:8px 14px 4px}
+  .s-item{padding:9px 14px;font-size:12px}
+  .main{padding:16px}
+
+  /* ━━━ 수신관리 / 체크리스트 ━━━ */
+  .sgrid{grid-template-columns:repeat(3,1fr) !important;gap:8px}
+  .sval{font-size:28px !important}
+  /* 수신현황 테이블 */
+  .ovw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .ovt{font-size:12px}
+  .ovt th,.ovt td{padding:7px 5px}
+  .ovt th.vhdr{min-width:48px}
+  .ovt th.vhdr .vt{font-size:9px}
+  /* 체크리스트 테이블 */
+  .cl-tbl{font-size:12px}
+  .cl-tbl th,.cl-tbl td{padding:8px 10px}
+  /* 드롭존 */
+  .dz{padding:28px 20px}
+
+  /* ━━━ 대시보드 ━━━ */
+  .kpi-row{grid-template-columns:repeat(3,1fr) !important;gap:8px}
+  .kpi-card{padding:12px 14px}
+  .kpi-value{font-size:20px}
+  .kpi-label{font-size:10px}
+  .chart-grid-2{grid-template-columns:1fr 1fr !important}
+  .chart-grid-3{grid-template-columns:1fr 1fr !important}
+  .chart-wrap{height:220px}
+  .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table.dtable th{font-size:11px;padding:8px 8px}
+  table.dtable td{font-size:12px;padding:9px 8px}
+  #module-dashboard .card{padding:14px}
+  #module-dashboard .card-title{font-size:12px}
+  .sido-filter{gap:4px;flex-wrap:wrap}
+  .sido-chip{padding:3px 8px;font-size:11px}
+  /* 학교별 분석 */
+  .indicator-grid{grid-template-columns:repeat(2,1fr) !important}
+  .ind-category{padding:12px}
+  /* 심층분석 서브탭 */
+  .ana-subtab{padding:8px 12px;font-size:12px}
+  /* 사업 예측 모델 */
+  .pred-stat-grid{grid-template-columns:1fr 1fr !important}
+  .pred-big{font-size:40px}
+  /* 지역별 분석 lv2 */
+  .lv2-reg-tab{padding:5px 10px;font-size:11px}
+  /* 학교 서브탭 */
+  .stab{padding:5px 10px;font-size:11px}
+  /* 교육청 필터 */
+  .edu-chip{padding:6px 10px;font-size:11px}
+  .edu-subtab{padding:8px 12px;font-size:12px}
+
+  /* ━━━ 연구 진행 ━━━ */
+  .research-subtabs{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .research-subtabs .tab{white-space:nowrap;flex-shrink:0;font-size:13px}
+  .hwpx-upload-area{padding:20px !important}
+  .hwpx-grid{grid-template-columns:1fr !important}
+
+  /* ━━━ 지도 현황 ━━━ */
+  /* 상단 툴바 줄바꿈 */
+  #module-map > div:first-child > div:first-child > div:last-child{flex-wrap:wrap;gap:6px 10px}
+  #mapSearchInput{width:150px !important}
+  /* 필터 패널 */
+  #mapFilterPanel{width:180px !important;padding:12px !important}
   #mapFilterPanel .label-up{font-size:11px}
-  .map-score-btn{font-size:10px;padding:4px 6px}
+  .map-score-btn{font-size:10px;padding:4px 5px}
   .map-filter-item{font-size:11px}
   .map-grade-label{font-size:11px}
-
-  /* ── 지도: 로드뷰 패널 폭 축소 ── */
-  #mapRoadviewPanel{width:320px !important}
-  #mapRoadviewMinimapWrap{height:130px !important}
-
-  /* ── 지도: 학교 목록 패널 폭 축소 ── */
-  #mapSchoolListPanel{width:260px !important}
-
-  /* ── 사이드바 ── */
-  .sidebar{width:200px}
-  .s-item{padding:10px 14px;font-size:13px}
-
-  /* ── 테이블 가로 스크롤 보장 ── */
-  .ovw{overflow-x:auto;-webkit-overflow-scrolling:touch}
-  .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
-
-  /* ── 대시보드 ── */
-  .kpi-row{grid-template-columns:repeat(3,1fr) !important}
-  .chart-grid-3{grid-template-columns:1fr 1fr !important}
-  table.dtable th,table.dtable td{padding:8px 8px;font-size:12px}
-
-  /* ── 모달 ── */
-  .modal-box{max-width:680px !important}
-
-  /* ── 연구 진행 ── */
-  .hwpx-grid{grid-template-columns:1fr !important}
+  /* 로드뷰 패널 */
+  #mapRoadviewPanel{width:300px !important}
+  #mapRoadviewMinimapWrap{height:120px !important}
+  /* 학교 목록 패널 */
+  #mapSchoolListPanel{width:250px !important}
+  /* 지도 서브탭 */
+  .map-subtab{font-size:12px;padding:0 14px}
 }
 
 /* ROUTING TABLE */
