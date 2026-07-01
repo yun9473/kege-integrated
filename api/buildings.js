@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import { verifyAuth, cors } from './_auth.js';
 
 const ALLOWED_FIELDS = [
   'school_name', 'building_name', 'gross_area', 'built_year',
@@ -7,13 +6,20 @@ const ALLOWED_FIELDS = [
 ];
 
 export default async function handler(req, res) {
-  cors(res);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const profile = await verifyAuth(req);
-  if (!profile || profile.role !== 'admin') return res.status(403).json({ error: '권한 없음' });
-
   const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+  const token = (req.headers.authorization || '').replace('Bearer ', '');
+  if (!token) return res.status(401).json({ error: '토큰 없음', reason: 'no_token' });
+  const { data: { user }, error: userErr } = await sb.auth.getUser(token);
+  if (userErr || !user) return res.status(401).json({ error: '인증 실패', reason: 'invalid_token', detail: userErr ? userErr.message : null });
+  const { data: profile } = await sb.from('profiles').select('*').eq('id', user.id).single();
+  if (!profile) return res.status(403).json({ error: '프로필 없음', reason: 'no_profile' });
+  if (profile.role !== 'admin') return res.status(403).json({ error: '권한 없음', reason: 'not_admin', role: profile.role });
 
   if (req.method === 'GET') {
     const projectId = req.query.project_id;
