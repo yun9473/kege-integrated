@@ -9447,6 +9447,19 @@ var _roadviewMinimap = null;
 var _roadviewMinimapMarker = null;
 var _roadviewFullscreen = false;
 var _rvClient = null;
+var _rvMapClickListener = null;
+
+function _mapRvMoveToPos(pos) {
+  if (!_rvClient || !_roadviewObj) return;
+  _rvClient.getNearestPanoId(pos, 200, function(pid) {
+    if (!pid) return;
+    _roadviewObj.setPanoId(pid, pos);
+    if (_roadviewMinimapMarker) {
+      _roadviewMinimapMarker.setPosition(pos);
+      if (_roadviewMinimap) _roadviewMinimap.setCenter(pos);
+    }
+  });
+}
 
 function mapOpenRoadview(lat, lng, schoolName) {
   var panel    = document.getElementById('mapRoadviewPanel');
@@ -9459,6 +9472,13 @@ function mapOpenRoadview(lat, lng, schoolName) {
   container.style.display = 'block';
   panel.style.display = 'flex';
   if (_mapObj) _mapObj.relayout();
+
+  // 지도 클릭 → 로드뷰 이동 리스너 (이전 것 제거 후 재등록)
+  if (_mapObj) {
+    if (_rvMapClickListener) kakao.maps.event.removeListener(_mapObj, 'click', _rvMapClickListener);
+    _rvMapClickListener = function(e) { _mapRvMoveToPos(e.latLng); };
+    kakao.maps.event.addListener(_mapObj, 'click', _rvMapClickListener);
+  }
 
   if (!_rvClient) _rvClient = new kakao.maps.RoadviewClient();
   var pos = new kakao.maps.LatLng(lat, lng);
@@ -9528,6 +9548,10 @@ function mapCloseRoadview() {
   _roadviewFullscreen = false;
   panel.style.cssText = 'display:none;position:absolute;top:0;right:0;width:420px;height:100%;background:#fff;border-left:1px solid #e0e0e0;z-index:20;flex-direction:column;';
   document.getElementById('mapRvFullscreenBtn').innerHTML = '⛶ 전체화면';
+  if (_mapObj && _rvMapClickListener) {
+    kakao.maps.event.removeListener(_mapObj, 'click', _rvMapClickListener);
+    _rvMapClickListener = null;
+  }
   if (_mapObj) _mapObj.relayout();
 }
 
